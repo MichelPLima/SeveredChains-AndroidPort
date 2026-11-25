@@ -60,6 +60,25 @@ B parece o mais controlável, porque o upstream já tem a abstração `PlatformM
 | Arquivos | `.` relativo | `user.dir` = pasta do app |
 | Discord | SDK | Desligado |
 
+## Entrada no Odin 2 Portal (medido no M2, 2026-11-25)
+
+Como o controle embutido chega ao app (KeyEvent/MotionEvent com fonte gamepad/joystick):
+
+| Controle | Chega como |
+|---|---|
+| Analógico esquerdo | eixos `AXIS_X` (0) e `AXIS_Y` (1) |
+| Analógico direito | eixos `AXIS_Z` (11) e `AXIS_RZ` (14) |
+| Direcional | eixos `AXIS_HAT_X` (15) e `AXIS_HAT_Y` (16), valores -1/0/1 (não chega como tecla DPAD) |
+| Gatilhos L2/R2 | tecla `BUTTON_L2`/`BUTTON_R2` (104/105) **e** eixos analógicos `AXIS_LTRIGGER`/`AXIS_RTRIGGER` (17/18), repetidos em `AXIS_BRAKE`/`AXIS_GAS` (23/22) |
+| B, X, Y | `BUTTON_B` (97), `BUTTON_X` (99), `BUTTON_Y` (100) |
+| L1, R1 | `BUTTON_L1` (102), `BUTTON_R1` (103) |
+| L3, R3 | `BUTTON_THUMBL` (106), `BUTTON_THUMBR` (107) |
+| A, Start, Select | não exercitados no teste (esperado: 96, 108, 109) |
+
+Consequências para o `AndroidInput` (M3): mapear HAT para direcional; usar os eixos de gatilho como analógico e ignorar a duplicata GAS/BRAKE; tratar L2/R2 tanto como botão quanto como eixo.
+
+GPU (M2): Adreno 740, OpenGL ES 3.2 V@0676.53, GLSL ES 3.20, `EXT_geometry_shader` e `EXT_clip_cull_distance` presentes; ~118,5 FPS (vsync de 120 Hz) com geometry shader.
+
 ## Identificação do app
 
 - applicationId provisório: `io.github.<usuario>.severedchains` (não usar "sony" nem "dragoon" no pacote)

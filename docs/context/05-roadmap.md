@@ -19,8 +19,8 @@ Marcos do APK (cada um gera um APK instalado manualmente no Odin, com log na tel
 
 | Marco | Conteúdo | Fase |
 |---|---|---|
-| M1 JVM viva | HotSpot 25 dentro do app, teste de versão/arquitetura/benchmark | 2 |
-| M2 Tela | LWJGL + GLES 3.2 desenhando na Surface a partir do HotSpot; botões do Odin no log | 3a |
+| M1 JVM viva ✅ | HotSpot 25 dentro do app, teste de versão/arquitetura/benchmark | 2 |
+| M2 Tela ✅ | LWJGL + GLES 3.2 desenhando na Surface a partir do HotSpot; botões do Odin no log | 3a |
 | M3 Jogo | Shim de plataforma, importação dos ISOs (SAF), extração, tela título em GLES | 3b |
 | M4 Completo | Áudio, FMV, Discord off, pausa/retomada, saves | 4 |
 | M5 Launcher | UI, mods, opções | 5 |
@@ -32,7 +32,7 @@ Marcos do APK (cada um gera um APK instalado manualmente no Odin, com log na tel
 
 ## Fase 3 (Spike 2): Janela, GLES e entrada
 - [x] Decidir SDL3 vs shim (`PlatformManager`) e registrar em 04-decisoes.md (shim, 2026-11-25)
-- [ ] Natives LWJGL 3.4.3 android-arm64 (core, opengles, openal, opus, stb, assimp, shaderc, spvc)
+- [ ] Natives LWJGL 3.4.3 android-arm64 (core, opengles, openal, opus, stb, assimp, shaderc, spvc): core + opengles OK no M2 (2026-11-25)
 - [ ] Tela título renderizando na Surface Android pelo caminho GlesApi (`-Dsc.renderer=gles`), sem erro de shader
 - **Pronto quando:** tela título com gamepad funcionando dentro do APK
 

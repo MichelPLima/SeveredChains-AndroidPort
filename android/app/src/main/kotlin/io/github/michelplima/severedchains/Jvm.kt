@@ -40,6 +40,9 @@ object Jvm {
             add("-Dorg.lwjgl.librarypath=$libDir")
             add("-Dorg.lwjgl.opengles.libname=libGLESv2.so")
             add("-Dorg.lwjgl.egl.libname=libEGL.so")
+            // O jar Java traz o SHA-1 do liblwjgl.so oficial de Linux; o nosso é build Android (mesma tag 3.4.3),
+            // então o hash nunca bate e o LWJGL imprime "Incompatible Java and native library versions" à toa
+            add("-Dorg.lwjgl.util.NoHashChecks=true")
             addAll(extras)
         }
 
