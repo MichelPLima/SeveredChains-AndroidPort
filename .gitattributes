@@ -1,0 +1,4 @@
+# Patches do upstream podem conter linhas CRLF (parte dos arquivos do upstream é CRLF no repositório).
+# Não converter fim de linha, senão o git am deixa de aplicar.
+*.patch -text
+*.sh text eol=lf

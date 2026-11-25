@@ -1,0 +1,223 @@
+From 8305ec756f2821d38a7e47901c39d4e640f1e4f7 Mon Sep 17 00:00:00 2001
+From: MichelPLima <109321208+MichelPLima@users.noreply.github.com>
+Date: Tue, 24 Nov 2026 21:32:27 -0300
+Subject: [PATCH] =?UTF-8?q?For=C3=A7ar=20contexto=20GLES=203.2=20via=20con?=
+ =?UTF-8?q?fig=20(renderer=3Dgles)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Adiciona RendererMode (auto | gl | gles), lido de -Dsc.renderer ou de
+renderer= no config.conf (padrão: auto, comportamento original).
+
+- auto: GL 3.3 com fallback GLES 3.2, igual ao upstream
+- gl:   só OpenGL 3.3, erro claro se indisponível
+- gles: só OpenGL ES 3.2; as funções GLES vêm de SDL_GL_GetProcAddress
+        (OPENGLES_EXPLICIT_INIT) em vez do libGLESv2 padrão do LWJGL,
+        para funcionar com WGL, GLX, EGL, ANGLE e Android
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/main/java/legend/core/Config.java         |  6 ++
+ .../legend/core/platform/RendererMode.java    | 42 +++++++++
+ .../java/legend/core/platform/SdlWindow.java  | 87 +++++++++++++++++--
+ 3 files changed, 130 insertions(+), 5 deletions(-)
+ create mode 100644 src/main/java/legend/core/platform/RendererMode.java
+
+diff --git a/src/main/java/legend/core/Config.java b/src/main/java/legend/core/Config.java
+index 6c0c35cf2..14de8b50e 100644
+--- a/src/main/java/legend/core/Config.java
++++ b/src/main/java/legend/core/Config.java
+@@ -37,6 +37,7 @@ public final class Config {
+     properties.setProperty("game_speed_multiplier", "1");
+     properties.setProperty("combat_stage", "false");
+     properties.setProperty("combat_stage_id", "0");
++    properties.setProperty("renderer", "auto");
+   }
+ 
+   private static int gameSpeedMultiplier = 1;
+@@ -66,6 +67,11 @@ public final class Config {
+     return readInt("window_height", 480, 1, Integer.MAX_VALUE);
+   }
+ 
++  /** auto, gl or gles. See {@link legend.core.platform.RendererMode} */
++  public static String renderer() {
++    return properties.getProperty("renderer", "auto");
++  }
++
+   public static boolean combatStage() {
+     return readBool("combat_stage", false);
+   }
+diff --git a/src/main/java/legend/core/platform/RendererMode.java b/src/main/java/legend/core/platform/RendererMode.java
+new file mode 100644
+index 000000000..cadf3bfbe
+--- /dev/null
++++ b/src/main/java/legend/core/platform/RendererMode.java
+@@ -0,0 +1,42 @@
++package legend.core.platform;
++
++import legend.core.Config;
++import org.apache.logging.log4j.LogManager;
++import org.apache.logging.log4j.Logger;
++
++import java.util.Locale;
++
++/**
++ * Which graphics API the window should create a context for.
++ *
++ * <p>Read from the {@code sc.renderer} system property first (e.g. {@code -Dsc.renderer=gles}), then from {@code renderer} in config.conf.</p>
++ */
++public enum RendererMode {
++  /** Try OpenGL 3.3 first, then fall back to OpenGL ES 3.2 */
++  AUTO,
++  /** OpenGL 3.3 only */
++  GL,
++  /** OpenGL ES 3.2 only */
++  GLES,
++  ;
++
++  private static final Logger LOGGER = LogManager.getFormatterLogger(RendererMode.class);
++
++  public static final String PROPERTY = "sc.renderer";
++
++  public static RendererMode get() {
++    final String property = System.getProperty(PROPERTY);
++    final String value = property != null ? property : Config.renderer();
++
++    if(value == null || value.isBlank()) {
++      return AUTO;
++    }
++
++    try {
++      return valueOf(value.trim().toUpperCase(Locale.ROOT));
++    } catch(final IllegalArgumentException e) {
++      LOGGER.warn("Unknown renderer \"%s\" (expected auto, gl or gles), using auto", value);
++      return AUTO;
++    }
++  }
++}
+diff --git a/src/main/java/legend/core/platform/SdlWindow.java b/src/main/java/legend/core/platform/SdlWindow.java
+index 64449ec13..d9e5b9e2d 100644
+--- a/src/main/java/legend/core/platform/SdlWindow.java
++++ b/src/main/java/legend/core/platform/SdlWindow.java
+@@ -16,6 +16,8 @@ import org.lwjgl.opengles.GLESCapabilities;
+ import org.lwjgl.sdl.SDL_DisplayMode;
+ import org.lwjgl.sdl.SDL_Rect;
+ import org.lwjgl.sdl.SDL_Surface;
++import org.lwjgl.sdl.SDLVideo;
++import org.lwjgl.system.Configuration;
+ import org.lwjgl.system.MemoryStack;
+ 
+ import java.nio.ByteBuffer;
+@@ -116,21 +118,42 @@ public class SdlWindow extends Window {
+     final long[] windowRef = {0};
+     final long[] contextRef = {0};
+ 
+-    this.createOpenGlWindow(title, width, height, windowRef, contextRef);
++    final RendererMode rendererMode = RendererMode.get();
++    LOGGER.info("Renderer mode: %s", rendererMode);
++
++    if(rendererMode == RendererMode.GL) {
++      if(!this.createForcedOpenGlWindow(title, width, height, windowRef, contextRef)) {
++        throw new RuntimeException("renderer=gl: OpenGL 3.3 is not available on this device. Use renderer=auto or renderer=gles.");
++      }
+ 
+-    if(windowRef[0] != NULL) {
+       this.window = windowRef[0];
+       this.context = contextRef[0];
+       this.renderApi = new GlApi();
++    } else if(rendererMode == RendererMode.GLES) {
++      if(!this.createForcedOpenGlesWindow(title, width, height, windowRef, contextRef)) {
++        throw new RuntimeException("renderer=gles: OpenGL ES 3.2 is not available on this device. Use renderer=auto or renderer=gl.");
++      }
++
++      this.window = windowRef[0];
++      this.context = contextRef[0];
++      this.renderApi = new GlesApi();
+     } else {
+-      this.createOpenGlesWindow(title, width, height, windowRef, contextRef);
++      this.createOpenGlWindow(title, width, height, windowRef, contextRef);
+ 
+       if(windowRef[0] != NULL) {
+         this.window = windowRef[0];
+         this.context = contextRef[0];
+-        this.renderApi = new GlesApi();
++        this.renderApi = new GlApi();
+       } else {
+-        throw new RuntimeException("This device does not support OpenGL 3.3 or OpenGLES 3.2. Severed Chains requires at least one of those in order to run.");
++        this.createOpenGlesWindow(title, width, height, windowRef, contextRef);
++
++        if(windowRef[0] != NULL) {
++          this.window = windowRef[0];
++          this.context = contextRef[0];
++          this.renderApi = new GlesApi();
++        } else {
++          throw new RuntimeException("This device does not support OpenGL 3.3 or OpenGLES 3.2. Severed Chains requires at least one of those in order to run.");
++        }
+       }
+     }
+ 
+@@ -168,6 +191,60 @@ public class SdlWindow extends Window {
+     }
+   }
+ 
++  /** renderer=gl: OpenGL 3.3 only, no fallback */
++  private boolean createForcedOpenGlWindow(final String title, final int width, final int height, final long[] windowRef, final long[] contextRef) {
++    LOGGER.info("Initializing OpenGL 3.3 (forced)...");
++    this.createGlWindow(title, width, height, SDL_GL_CONTEXT_PROFILE_CORE, 3, 3, windowRef, contextRef);
++
++    if(windowRef[0] == NULL) {
++      return false;
++    }
++
++    if(!GL.createCapabilities().OpenGL33) {
++      LOGGER.warn("OpenGL 3.3 is not supported");
++      this.destroyGlWindow(windowRef, contextRef);
++      return false;
++    }
++
++    return true;
++  }
++
++  /**
++   * renderer=gles: OpenGL ES 3.2 only, no fallback.
++   *
++   * <p>By default LWJGL loads GLES functions from libGLESv2 (ANGLE naming), which doesn't exist on most desktops even when the driver can create an ES
++   * context (e.g. WGL_EXT_create_context_es2_profile). Ask SDL for the function addresses instead, which works with WGL, GLX, EGL, ANGLE and Android.</p>
++   */
++  private boolean createForcedOpenGlesWindow(final String title, final int width, final int height, final long[] windowRef, final long[] contextRef) {
++    LOGGER.info("Initializing OpenGLES 3.2 (forced)...");
++
++    // Must be set before the GLES class is initialized, otherwise it tries to load libGLESv2 itself
++    Configuration.OPENGLES_EXPLICIT_INIT.set(true);
++
++    this.createGlWindow(title, width, height, SDL_GL_CONTEXT_PROFILE_ES, 3, 2, windowRef, contextRef);
++
++    if(windowRef[0] == NULL) {
++      return false;
++    }
++
++    GLES.create(SDLVideo::SDL_GL_GetProcAddress);
++
++    if(!GLES.createCapabilities().GLES32) {
++      LOGGER.warn("OpenGLES 3.2 is not supported");
++      this.destroyGlWindow(windowRef, contextRef);
++      return false;
++    }
++
++    return true;
++  }
++
++  private void destroyGlWindow(final long[] windowRef, final long[] contextRef) {
++    SDL_GL_DestroyContext(contextRef[0]);
++    SDL_DestroyWindow(windowRef[0]);
++    windowRef[0] = NULL;
++    contextRef[0] = NULL;
++  }
++
+   private void createGlWindow(final String title, final int width, final int height, final int profile, final int majorVersion, final int minorVersion, final long[] windowRef, final long[] contextRef) {
+     windowRef[0] = NULL;
+     contextRef[0] = NULL;
+-- 
+2.56.1.windows.1
+

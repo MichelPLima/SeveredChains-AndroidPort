@@ -1,0 +1,32 @@
+# Dados do jogo: nunca versionar
+*.iso
+*.bin
+*.cue
+*.img
+isos/
+saves/
+files/
+
+# Build
+build/
+.gradle/
+local.properties
+*.apk
+*.aab
+*.so
+natives/out/
+natives/src/
+
+# IDE
+.idea/
+*.iml
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Logs
+*.log
+CRASHLOG-*
+
+# Protótipos
+prototipo/**/out/
