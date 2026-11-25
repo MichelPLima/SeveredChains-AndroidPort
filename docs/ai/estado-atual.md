@@ -14,8 +14,8 @@ Feito:
 - Análises de causa em docs/processos/casos/: build sem JDK, GLES indisponível no PC, CRLF nos patches de script
 
 Próximo passo:
-- Primeiro commit do repositório raiz (combinar com o Michel)
-- Fase 1: rodar o build Linux ARM oficial no Android via Termux + proot (prototipo/termux/), medir FPS e testar -Dsc.renderer=gles (geometry shader tmd.gsh no driver do aparelho)
+- Michel instala o adb (Platform Tools, manual) e habilita a depuração USB no Odin 2 Portal (Snapdragon 8 Gen 2 / Adreno 740, 16:9)
+- Fase 1: gerar build Linux ARM64 com o patch (gradlew build -Pos=linux -Parch=aarch64) e rodá-lo no Odin via Termux + proot (prototipo/termux/), medir FPS e testar -Dsc.renderer=gles (geometry shader tmd.gsh no driver do aparelho)
 
 Bloqueios:
 - nenhum

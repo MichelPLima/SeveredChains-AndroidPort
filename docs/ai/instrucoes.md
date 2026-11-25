@@ -8,6 +8,11 @@ Regras:
 - Antes de mudar a arquitetura, registrar a decisão em docs/context/04-decisoes.md.
 - Ao terminar uma tarefa, atualizar docs/ai/estado-atual.md (feito, próximo passo, bloqueios).
 - Problemas: registrar seguindo docs/processos/analise-de-causa.md.
+- Aparelho de teste (AYN Odin 2 Portal) é a coleção pessoal de ROMs do Michel. Com adb:
+  - Escrever só em /sdcard/SeveredChains-teste/ e no diretório interno do Termux
+  - Nunca rodar rm/mv fora dessa pasta; nunca listar nem ler outras pastas do armazenamento
+  - Nunca instalar/desinstalar apps (adb install, pm uninstall) nem mudar configurações do aparelho sem perguntar
+  - Os ISOs são copiados para o aparelho pelo Michel, nunca pelo adb
 - O mantenedor (Michel) domina T-SQL/C#/PowerShell. Em Kotlin/NDK/Gradle Android, explicar decisões sem assumir familiaridade profunda.
 
 Fatos-chave:
