@@ -6,10 +6,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
-import java.io.File
 
 /**
- * Roda no processo ":jvm". Cria a HotSpot 25 e executa o programa de teste (runtime-test.jar).
+ * M1, processo ":jvm": cria a HotSpot 25 e executa o programa de teste (scandroid.m1.Hello).
  * Ao sair desta tela o processo é encerrado, porque a JVM só pode ser criada uma vez por processo.
  */
 class JvmActivity : Activity() {
@@ -49,27 +48,7 @@ class JvmActivity : Activity() {
             tela.status("A JVM já rodou neste processo. Feche e inicie de novo pela tela principal.")
             return
         }
-
-        val javaHome = RuntimeInstaller.javaHome(this)
-        val trabalho = File(filesDir, "m1").apply { mkdirs() }
-        val jar = File(trabalho, "runtime-test.jar")
-        assets.open("m1/runtime-test.jar").use { entrada -> jar.outputStream().use { entrada.copyTo(it) } }
-
-        val opcoes = arrayOf(
-            "-Djava.class.path=${jar.path}",
-            "-Djava.io.tmpdir=${cacheDir.path}",
-            "-Duser.home=${filesDir.path}",
-            "-Dfile.encoding=UTF-8",
-            "-Dsun.jnu.encoding=UTF-8",
-            "-Xmx1024m",
-            // Arquivo de crash da HotSpot na pasta de logs, para entrar no "Salvar log"
-            "-XX:ErrorFile=${Logs.pasta(this).path}/hs_err_pid%p.log",
-            // Não registrar handlers de SIGQUIT/SIGINT/SIGTERM/SIGHUP (são do Android/ART)
-            "-Xrs",
-        )
-
-        Logs.escrever(this, "Iniciando HotSpot: java.home=${javaHome.path}")
-        val r = Native.iniciarJvm(javaHome.path, trabalho.path, Logs.principal(this).path, opcoes, "scandroid/m1/Hello", arrayOf())
+        val r = Jvm.iniciar(this, "scandroid/m1/Hello")
         if(r != 0) {
             tela.status("Falha ao iniciar: ${Native.descreverErro(r)}")
             return

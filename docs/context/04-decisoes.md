@@ -57,5 +57,15 @@ Formato: data, decisão, motivo, status. Não apagar entradas antigas: marcar co
 - Motivo: versões estáveis mais recentes em 2026-11-25; o NDK funciona em host Windows para as bibliotecas C/C++ (LWJGL, OpenAL, opus, assimp, shaderc...)
 - Status: aceita
 
+## 2026-11-25: Natives LWJGL Android prontos nos primeiros marcos
+- Decisão: `Open-Launcher-Collective/LWJGL3-Android-Builder` release `android-lwjgl-3.4.3` (lwjgl-3.4.3.zip, SHA-256 `dcc658ded7eee2f332ff77afeafb48194fb22b3910180a5e550df8fa3c83a6dd`), compilado no GitHub Actions a partir da tag oficial 3.4.3 com NDK 27.2 e a config Android do próprio LWJGL (ressalva: `libffi.a` pré-compilado do repositório deles). Usados: `liblwjgl.so` e `liblwjgl_opengles.so` (dependem de `libc++_shared.so`, levado do NDK r30). Parte Java do LWJGL vem do Maven (3.4.3, igual ao upstream). Mesma política do JRE: trocar por build nosso antes de distribuir
+- Motivo: o LWJGL não publica natives Android; os módulos com cola JNI própria (core, opengles, stb) precisam ser compilados para Android, e este é o único build comunitário encontrado com `opengles`. Os natives estão alinhados em 4 KB: servem no Odin (páginas de 4 KB), mas aparelhos com páginas de 16 KB vão exigir build próprio
+- Status: aceita (provisória até a Fase 6)
+
+## 2026-11-25: Ponte ART <-> HotSpot numa única biblioteca
+- Decisão: `libscjvm.so` é carregada pelo ART (`System.loadLibrary`) e pela HotSpot (`System.load` do mesmo caminho em `nativeLibraryDir`); o linker devolve a mesma cópia, então Surface, contexto EGL e fila de eventos são memória compartilhada. O EGL (display, config ES3, contexto 3.2, superfície) é feito em C na thread de render da HotSpot; as chamadas GL vêm do LWJGL (`org.lwjgl.opengles.libname=libGLESv2.so`, `org.lwjgl.egl.libname=libEGL.so`). Em `surfaceDestroyed`, o lado ART espera (até 2 s) a HotSpot destruir a EGLSurface; o contexto sobrevive à pausa
+- Motivo: base do `AndroidWindow` do shim (M3) sem SDL e sem um segundo canal de IPC
+- Status: aceita (validar no M2)
+
 ## Em aberto
 - Shaders: conversão em runtime ou pré-conversão no build

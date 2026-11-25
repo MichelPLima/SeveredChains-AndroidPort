@@ -15,10 +15,11 @@ Feito:
 - 2026-11-25, decisões do caminho APK (04-decisoes.md): pular o Termux; shim próprio de janela/entrada (sem SDL3); JRE 25 comunitário fixado (kelvinalumotos jre-25.0.5-2, inspecionado: bionic, aarch64, GNU_HASH, 16 KB); Android Studio + SDK 36 + Build-Tools 36.1.0 + NDK r30 + CMake 3.31.6 (ANDROID_HOME do usuário)
 - M1 implementado em android/ (AGP 9.5.2, Gradle 9.9.2): app Kotlin sem AndroidX, lançador nativo (dlopen libjvm + JNI_CreateJavaVM no processo ":jvm", stdout/stderr no log), runtime-test em Java 25, "Salvar log…" via SAF. APK debug sem permissões: dist/sc-android-m1.apk
 - Teste 1 no Odin (0.1.0-m1): HotSpot criada dentro do processo Android (sem conflito de sinais com o ART), mas falhou ao abrir o jar: "libnet.so not found ... classloader-namespace". Corrigido em 0.1.1-m1 com pré-carregamento das .so do JRE (caso 2026-11-25-libnet-not-found-namespace.md). Teste 2 (0.1.1-m1): **M1 OK** no Odin. 30/30 .so do JRE pré-carregadas; Java 25.0.5 HotSpot, aarch64, 8 núcleos; linguagem, arquivos, zip, threads e FFM OK; benchmark 13 → 9 ms (JIT C2 ativo); JVM encerra com código 0 em ~600 ms
+- M2 implementado (0.2.0-m2, dist/sc-android-m2.apk, 54 MB): ponte.c (Surface/EGL GLES 3.2/eventos compartilhados entre ART e HotSpot na mesma libscjvm.so), TelaActivity (SurfaceView, controle, toque, ciclo de vida), scandroid.m2.Tela (LWJGL + GLES: triângulo 320 es, geometry shader, FPS). Natives LWJGL: Open-Launcher-Collective android-lwjgl-3.4.3 (SHA-256 dcc658de…) + libc++_shared do NDK. **Ainda não testado no aparelho**
 
 Próximo passo:
-- M2 (Tela): natives LWJGL 3.4.3 core + opengles (Open-Launcher-Collective android-lwjgl-3.4.3, SHA-256 dcc658de…, fixado como o JRE), jars oficiais do Maven, ponte nativa Surface/eventos compartilhada entre ART e HotSpot (mesma libscjvm), EGL + GLES 3.2 desenhando a partir da HotSpot, botões do Odin no log
-- Atenção para o M2/M3: no Android, o LWJGL detecta Platform.LINUX e procura "libGLESv2.so.2" por padrão (não existe; é libGLESv2.so): criar GLES com function provider (eglGetProcAddress) ou ajustar org.lwjgl.opengles.libname; usar --enable-native-access=ALL-UNNAMED
+- Michel instala dist/sc-android-m2.apk (0.2.0-m2) no Odin, roda "M2: Tela (GLES)", aperta botões, testa Home/voltar, sai com Voltar e traz o log para logs/
+- Se M2 OK: M3 (Jogo): patch de escolha de plataforma (GameEngine.java:105), AndroidPlatformManager/AndroidWindow/AndroidInput sobre a ponte, natives restantes (openal, opus, assimp, shaderc, spvc, stb; mimalloc ou allocator system), importação dos ISOs via SAF
 
 Bloqueios:
 - nenhum

@@ -6,7 +6,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="SC-Android M1"
+        android:label="SC-Android"
         android:largeHeap="true"
         android:theme="@android:style/Theme.DeviceDefault">
 
@@ -25,5 +25,15 @@
             android:name=".JvmActivity"
             android:exported="false"
             android:process=":jvm" />
+
+        <!-- M2: tela cheia em paisagem; mudanças de configuração não recriam a Activity
+             (a Surface e a JVM continuam). -->
+        <activity
+            android:name=".TelaActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:exported="false"
+            android:process=":jvm"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" />
     </application>
 </manifest>
