@@ -1,6 +1,6 @@
 Atualizado: 2026-11-25
 
-Fase: 3 (M3 "Jogo" em andamento: etapa 1 OK no aparelho; próximo: etapa 2). Fases 0 e 2 (M1) concluídas; Fase 1 (Termux) cancelada
+Fase: 3 (M3 "Jogo" em andamento: etapa 1 OK no aparelho; etapa 2 implementada, aguardando teste). Fases 0 e 2 (M1) concluídas; Fase 1 (Termux) cancelada
 
 Feito:
 - Estrutura do repositório e docs iniciais; levantamento do upstream no commit edcf232
@@ -20,11 +20,12 @@ Feito:
 - Não exercitados no teste: botões A, Start, Select e o ciclo Home → voltar (Surface perdida/recriada)
 - M3 etapa 1 (0.3.0-m3a, dist/sc-android-m3a.apk, 63 MB): natives de terceiros compilados por nós (natives/build-android.sh, mesmos commits do LWJGL 3.4.3, 16 KB): libopenal (OpenSL), libopus (+opusfile+ogg, sem DRED), libspirv-cross, libshaderc; exports conferidos contra os bindings (natives/verificar-exports.sh). liblwjgl_stb do Open-Launcher-Collective. Jar do jogo (lod-game-snapshot.jar, branch android) no APK. Teste scandroid.m3.Bibliotecas: stb, opus, opusfile, OpenAL (bipe) e os 6 programas de shader do jogo via ShaderManager.transpileShader + compilação na GPU. No PC, os 6 programas transpilam para GLSL ES 320
 - Teste M3a (0.3.0-m3a) no Odin: **M3a OK**. stb (PNG 16x8), opus (20 ms -> 207 bytes -> 960 amostras), opusfile (op_test em lixo -> -132), OpenAL Soft (bipe de 660 Hz por 999 ms) e os 6 programas de shader do jogo (Simple, Copy, Standard, TMD e Battle TMD com geometry shader, Post) transpilados pelo ShaderManager e compilados/linkados na Adreno 740; JVM encerra com código 0
-- Detalhes cosméticos para o próximo APK: opus_get_version_string devolve "libopus unknown" (clone raso sem tag; gravar package_version no build), aviso de sun.misc.Unsafe do LWJGL (silenciar com --sun-misc-unsafe-memory-access=allow) e a mensagem "Tela M2 fechada" (genérica agora)
+- Detalhe cosmético pendente: opus_get_version_string devolve "libopus unknown" (clone raso sem tag; gravar package_version no build do opus)
+- M3 etapa 2 (0.4.0-m3b, dist/sc-android-m3b.apk, 130 MB): patch patches/0002-plataforma-android.patch (aplica limpo sobre edcf232 + 0001): com -Dsc.platform=android o GameEngine usa AndroidPlatformManager (controle com a lógica de bindings/deadzones do SDL, HAT -> direcional, gatilhos analógicos com BRAKE/GAS e L2/R2 de reserva, toque como mouse), AndroidWindow (Surface + EGL GLES 3.2 + GlesApi; pausa sem perder o contexto quando a Surface some) e AndroidBridge (natives da ponte; ponte.c renomeado para Java_legend_core_platform_AndroidBridge_*, + isContextCurrent). Testes M2/M3a passaram a usar AndroidBridge (scandroid.ponte.Ponte removido). APK leva o jogo inteiro: lod-game-snapshot.jar + 77 jars (upstream/build/libs/libs sem natives de PC e sem JavaFX) e 432 arquivos de suporte (gfx, lang, patches, log4j2.xml), copiados para filesDir só quando o APK muda. Botão "M3b: Jogo (sem discos)" roda legend.game.Main com diretório filesDir/jogo e as opções do launch do upstream (joml, --add-opens/--add-exports), -Xmx2048m, --sun-misc-unsafe-memory-access=allow. Logs sem as cores ANSI do log4j. Esperado: o jogo para na tela do Unpacker que pede os 4 discos. **Ainda não testado no aparelho**
 
 Próximo passo:
-- M3 etapa 2: patch de escolha de plataforma (GameEngine.java:105) + AndroidPlatformManager/AndroidWindow/AndroidInput sobre a ponte
-- Depois: etapa 3 (ISOs via SAF, gameDir no app, jars restantes do jogo), etapa 4 (tela título)
+- Michel instala dist/sc-android-m3b.apk, toca em "M3b: Jogo (sem discos)" e traz o log para logs/
+- Depois: etapa 3 (importar os ISOs via SAF para filesDir/jogo/isos), etapa 4 (tela título)
 
 Bloqueios:
 - nenhum

@@ -6,7 +6,8 @@
  * são compartilhadas pelas duas JVMs:
  *
  *   ART  (io.github.michelplima.severedchains.Native)  -> entrega Surface, tamanho e eventos
- *   HotSpot (scandroid.ponte.Ponte)                     -> cria EGL/GLES, desenha, lê eventos
+ *   HotSpot (legend.core.platform.AndroidBridge)        -> cria EGL/GLES, desenha, lê eventos
+ *           (classe do patch 0002 do jogo; os testes do runtime-test usam a mesma)
  *
  * Ciclo de vida da Surface: quando o Android destrói a Surface (Home, tela apagada), o lado
  * ART pede a liberação e ESPERA a HotSpot destruir a EGLSurface antes de devolver a janela.
@@ -188,7 +189,7 @@ static jboolean criarSuperficieTravado(void) {
 
 /** Cria display, config e contexto GLES 3.2 e a superfície na janela atual (espera a janela). */
 JNIEXPORT jboolean JNICALL
-Java_scandroid_ponte_Ponte_criarContexto(JNIEnv *env, jclass clazz) {
+Java_legend_core_platform_AndroidBridge_createContext(JNIEnv *env, jclass clazz) {
   (void)env;
   (void)clazz;
   dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
@@ -230,7 +231,7 @@ Java_scandroid_ponte_Ponte_criarContexto(JNIEnv *env, jclass clazz) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_scandroid_ponte_Ponte_trocarBuffers(JNIEnv *env, jclass clazz) {
+Java_legend_core_platform_AndroidBridge_swapBuffers(JNIEnv *env, jclass clazz) {
   (void)env;
   (void)clazz;
   return sup != EGL_NO_SURFACE && eglSwapBuffers(dpy, sup) ? JNI_TRUE : JNI_FALSE;
@@ -238,7 +239,7 @@ Java_scandroid_ponte_Ponte_trocarBuffers(JNIEnv *env, jclass clazz) {
 
 /** true se o Android pediu a Surface de volta (o jogo deve pausar e chamar liberarSuperficie). */
 JNIEXPORT jboolean JNICALL
-Java_scandroid_ponte_Ponte_janelaPerdida(JNIEnv *env, jclass clazz) {
+Java_legend_core_platform_AndroidBridge_surfaceLost(JNIEnv *env, jclass clazz) {
   (void)env;
   (void)clazz;
   pthread_mutex_lock(&mutex);
@@ -249,7 +250,7 @@ Java_scandroid_ponte_Ponte_janelaPerdida(JNIEnv *env, jclass clazz) {
 
 /** Solta a EGLSurface (o contexto continua vivo, com texturas e shaders). */
 JNIEXPORT void JNICALL
-Java_scandroid_ponte_Ponte_liberarSuperficie(JNIEnv *env, jclass clazz) {
+Java_legend_core_platform_AndroidBridge_releaseSurface(JNIEnv *env, jclass clazz) {
   (void)env;
   (void)clazz;
   eglMakeCurrent(dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, ctx);
@@ -265,7 +266,7 @@ Java_scandroid_ponte_Ponte_liberarSuperficie(JNIEnv *env, jclass clazz) {
 
 /** Espera uma nova janela e recria a EGLSurface. false se a Activity está encerrando. */
 JNIEXPORT jboolean JNICALL
-Java_scandroid_ponte_Ponte_recriarSuperficie(JNIEnv *env, jclass clazz) {
+Java_legend_core_platform_AndroidBridge_recreateSurface(JNIEnv *env, jclass clazz) {
   (void)env;
   (void)clazz;
   pthread_mutex_lock(&mutex);
@@ -275,8 +276,8 @@ Java_scandroid_ponte_Ponte_recriarSuperficie(JNIEnv *env, jclass clazz) {
 }
 
 JNIEXPORT void JNICALL
-Java_scandroid_ponte_Ponte_destruirContexto(JNIEnv *env, jclass clazz) {
-  Java_scandroid_ponte_Ponte_liberarSuperficie(env, clazz);
+Java_legend_core_platform_AndroidBridge_destroyContext(JNIEnv *env, jclass clazz) {
+  Java_legend_core_platform_AndroidBridge_releaseSurface(env, clazz);
   if(ctx != EGL_NO_CONTEXT) {
     eglMakeCurrent(dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     eglDestroyContext(dpy, ctx);
@@ -284,8 +285,16 @@ Java_scandroid_ponte_Ponte_destruirContexto(JNIEnv *env, jclass clazz) {
   }
 }
 
+/** O contexto EGL está ativo nesta thread (o jogo só mexe em GL na thread de render). */
+JNIEXPORT jboolean JNICALL
+Java_legend_core_platform_AndroidBridge_isContextCurrent(JNIEnv *env, jclass clazz) {
+  (void)env;
+  (void)clazz;
+  return eglGetCurrentContext() != EGL_NO_CONTEXT ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT jint JNICALL
-Java_scandroid_ponte_Ponte_largura(JNIEnv *env, jclass clazz) {
+Java_legend_core_platform_AndroidBridge_width(JNIEnv *env, jclass clazz) {
   (void)env;
   (void)clazz;
   pthread_mutex_lock(&mutex);
@@ -295,7 +304,7 @@ Java_scandroid_ponte_Ponte_largura(JNIEnv *env, jclass clazz) {
 }
 
 JNIEXPORT jint JNICALL
-Java_scandroid_ponte_Ponte_altura(JNIEnv *env, jclass clazz) {
+Java_legend_core_platform_AndroidBridge_height(JNIEnv *env, jclass clazz) {
   (void)env;
   (void)clazz;
   pthread_mutex_lock(&mutex);
@@ -305,7 +314,7 @@ Java_scandroid_ponte_Ponte_altura(JNIEnv *env, jclass clazz) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_scandroid_ponte_Ponte_deveEncerrar(JNIEnv *env, jclass clazz) {
+Java_legend_core_platform_AndroidBridge_shouldQuit(JNIEnv *env, jclass clazz) {
   (void)env;
   (void)clazz;
   return atomic_load(&encerrar) ? JNI_TRUE : JNI_FALSE;
@@ -316,7 +325,7 @@ Java_scandroid_ponte_Ponte_deveEncerrar(JNIEnv *env, jclass clazz) {
  * ints[0]=codigo, ints[1]=acao, floats[0]=valor, floats[1]=valor2.
  */
 JNIEXPORT jint JNICALL
-Java_scandroid_ponte_Ponte_proximoEvento(JNIEnv *env, jclass clazz, jintArray ints, jfloatArray floats) {
+Java_legend_core_platform_AndroidBridge_nextEvent(JNIEnv *env, jclass clazz, jintArray ints, jfloatArray floats) {
   (void)clazz;
   pthread_mutex_lock(&mutex);
   if(filaInicio == filaFim) {

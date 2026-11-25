@@ -14,7 +14,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.util.opus.Opus;
 import org.lwjgl.util.opus.OpusFile;
-import scandroid.ponte.Ponte;
+import legend.core.platform.AndroidBridge;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
@@ -103,7 +103,7 @@ public final class Bibliotecas {
   public static void main(final String[] args) {
     System.out.println("== M3a: bibliotecas do jogo ==");
 
-    if(!Ponte.criarContexto()) {
+    if(!AndroidBridge.createContext()) {
       System.out.println("[FALHOU] contexto EGL/GLES 3.2");
       return;
     }
@@ -118,23 +118,23 @@ public final class Bibliotecas {
     System.out.println(falhas == 0 ? "== M3a OK: todas as bibliotecas funcionam ==" : "== M3a terminou com " + falhas + " falha(s) ==");
 
     // Tela verde (tudo OK) ou vermelha (falhas) até a Activity encerrar
-    while(!Ponte.deveEncerrar()) {
-      if(Ponte.janelaPerdida()) {
-        Ponte.liberarSuperficie();
-        if(!Ponte.recriarSuperficie()) {
+    while(!AndroidBridge.shouldQuit()) {
+      if(AndroidBridge.surfaceLost()) {
+        AndroidBridge.releaseSurface();
+        if(!AndroidBridge.recreateSurface()) {
           break;
         }
       }
-      glViewport(0, 0, Math.max(1, Ponte.largura()), Math.max(1, Ponte.altura()));
+      glViewport(0, 0, Math.max(1, AndroidBridge.width()), Math.max(1, AndroidBridge.height()));
       if(falhas == 0) {
         glClearColor(0.05f, 0.45f, 0.15f, 1.0f);
       } else {
         glClearColor(0.55f, 0.05f, 0.05f, 1.0f);
       }
       glClear(GL_COLOR_BUFFER_BIT);
-      Ponte.trocarBuffers();
+      AndroidBridge.swapBuffers();
     }
-    Ponte.destruirContexto();
+    AndroidBridge.destroyContext();
     System.out.println("== M3a encerrado ==");
   }
 

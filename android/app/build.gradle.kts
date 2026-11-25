@@ -18,8 +18,12 @@ val nativesLwjglUsados = listOf("liblwjgl.so", "liblwjgl_opengles.so", "liblwjgl
 // Natives de terceiros compilados por nós (natives/build-android.sh), mesmos commits do LWJGL 3.4.3
 val nativesProprios = listOf("libopenal.so", "libopus.so", "libshaderc.so", "libspirv-cross.so")
 val pastaNativesProprios = rootProject.layout.projectDirectory.dir("../natives/out/arm64-v8a")
-// Arquivos do jogo que vão nos assets (do submódulo upstream, nunca dados do jogo)
-val pastaShadersDoJogo = rootProject.layout.projectDirectory.dir("../upstream/gfx/shaders")
+// Distribuição do jogo gerada pelo build do upstream (cd upstream && ./gradlew build): jar, dependências e
+// arquivos de suporte do repositório do Severed Chains (gfx, lang, patches). Nunca dados do jogo (ISOs, files/)
+val pastaDistribuicaoDoJogo = rootProject.layout.projectDirectory.dir("../upstream/build/libs")
+val arquivosDeSuporteDoJogo = listOf("gfx/**", "lang/**", "patches/**", "log4j2.xml", "credits.txt", "LICENSE")
+// Jars de libs/ que não vão para o Android: natives de PC (LWJGL, ffmpeg do bytedeco) e JavaFX (só o debugger usa)
+val jarsDoJogoExcluidos = listOf(Regex(".*-natives-.*\\.jar"), Regex("javafx-.*\\.jar"), Regex(".*-(windows|linux|macosx)-(x86_64|x86|arm64|aarch64)\\.jar"))
 
 android {
     namespace = "io.github.michelplima.severedchains"
@@ -30,8 +34,8 @@ android {
         applicationId = "io.github.michelplima.severedchains"
         minSdk = 28
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.3.0-m3a"
+        versionCode = 6
+        versionName = "0.4.0-m3b"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -106,15 +110,18 @@ abstract class BaixarVerificado : DefaultTask() {
 /**
  * Assets gerados:
  *   runtime/jre25.zip + runtime/jre25.sha256   runtime Java 25
- *   java/ (jars) + java/classpath.txt          programas de teste e dependências (LWJGL)
+ *   java/ (jars) + java/classpath.txt          jogo, dependências e programas de teste
+ *   jogo/ + jogo/arquivos.txt                  arquivos de suporte do jogo (gfx, lang, patches...)
  * (cuidado: em Kotlin, comentários de bloco se aninham; barra seguida de asterisco dentro de um
  *  comentário abre outro e comenta o resto do arquivo sem erro)
  */
 abstract class PrepararAssets : DefaultTask() {
     @get:InputFile abstract val jreZip: RegularFileProperty
     @get:Input abstract val jreSha256: Property<String>
+    /** Na ordem do classpath; jars com o mesmo nome entram uma vez só (o primeiro) */
     @get:InputFiles abstract val classpath: ConfigurableFileCollection
-    @get:InputDirectory abstract val shaders: DirectoryProperty
+    @get:InputFiles abstract val arquivosDoJogo: ConfigurableFileCollection
+    @get:Internal abstract val raizDoJogo: DirectoryProperty
     @get:OutputDirectory abstract val saida: DirectoryProperty
 
     @TaskAction
@@ -125,16 +132,21 @@ abstract class PrepararAssets : DefaultTask() {
         File(dir, "java").mkdirs()
         jreZip.get().asFile.copyTo(File(dir, "runtime/jre25.zip"))
         File(dir, "runtime/jre25.sha256").writeText(jreSha256.get())
-        val nomes = classpath.files.sortedBy { it.name }.map { jar ->
-            jar.copyTo(File(dir, "java/${jar.name}"))
-            jar.name
+        val nomes = LinkedHashSet<String>()
+        for(jar in classpath.files) {
+            if(nomes.add(jar.name)) {
+                jar.copyTo(File(dir, "java/${jar.name}"))
+            }
         }
         File(dir, "java/classpath.txt").writeText(nomes.joinToString("\n"))
-        // Shaders do jogo (GLSL 330 do upstream), listados para o app copiar sem varrer os assets
-        val destinoShaders = File(dir, "jogo/gfx/shaders").apply { mkdirs() }
-        val arquivos = shaders.get().asFile.listFiles()!!.filter { it.isFile }.sortedBy { it.name }
-        arquivos.forEach { it.copyTo(File(destinoShaders, it.name)) }
-        File(dir, "jogo/arquivos.txt").writeText(arquivos.joinToString("\n") { "gfx/shaders/${it.name}" })
+        // Arquivos de suporte do jogo, listados para o app copiar sem varrer os assets
+        val raiz = raizDoJogo.get().asFile
+        val caminhos = arquivosDoJogo.files.map { it.relativeTo(raiz).invariantSeparatorsPath }.sorted()
+        for(caminho in caminhos) {
+            File(raiz, caminho).copyTo(File(dir, "jogo/$caminho"))
+        }
+        File(dir, "jogo/arquivos.txt").writeText(caminhos.joinToString("\n"))
+        logger.lifecycle("Assets: ${nomes.size} jars, ${caminhos.size} arquivos do jogo")
     }
 }
 
@@ -192,9 +204,18 @@ val tarefaJarTeste = projetoTeste.tasks.named<Jar>("jar")
 val prepararAssets = tasks.register<PrepararAssets>("prepararAssets") {
     jreZip = baixarJre.flatMap { it.destino }
     jreSha256 = shaRuntimeJre
-    classpath.from(tarefaJarTeste.flatMap { it.archiveFile })
+    // Ordem: jogo primeiro (como no launch do upstream), depois as dependências dele, os testes por último
+    val jarDoJogo = pastaDistribuicaoDoJogo.file("lod-game-snapshot.jar")
+    val libsDoJogo = pastaDistribuicaoDoJogo.dir("libs").asFileTree.matching {
+        include("*.jar")
+        exclude { e -> jarsDoJogoExcluidos.any { it.matches(e.name) } }
+    }
+    classpath.from(jarDoJogo)
+    classpath.from(provider { libsDoJogo.files.sortedBy { it.name } })
     classpath.from(projetoTeste.configurations.named("runtimeClasspath"))
-    shaders = pastaShadersDoJogo
+    classpath.from(tarefaJarTeste.flatMap { it.archiveFile })
+    raizDoJogo = pastaDistribuicaoDoJogo
+    arquivosDoJogo.from(pastaDistribuicaoDoJogo.asFileTree.matching { include(arquivosDeSuporteDoJogo) })
 }
 
 val prepararJniLibs = tasks.register<PrepararJniLibs>("prepararJniLibs") {

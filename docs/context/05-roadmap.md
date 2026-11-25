@@ -21,7 +21,7 @@ Marcos do APK (cada um gera um APK instalado manualmente no Odin, com log na tel
 |---|---|---|
 | M1 JVM viva ✅ | HotSpot 25 dentro do app, teste de versão/arquitetura/benchmark | 2 |
 | M2 Tela ✅ | LWJGL + GLES 3.2 desenhando na Surface a partir do HotSpot; botões do Odin no log | 3a |
-| M3 Jogo | Shim de plataforma, importação dos ISOs (SAF), extração, tela título em GLES | 3b |
+| M3 Jogo | M3a bibliotecas ✅; M3b shim de plataforma (patch 0002, jogo abre sem discos); importação dos ISOs (SAF), extração, tela título em GLES | 3b |
 | M4 Completo | Áudio, FMV, Discord off, pausa/retomada, saves | 4 |
 | M5 Launcher | UI, mods, opções | 5 |
 

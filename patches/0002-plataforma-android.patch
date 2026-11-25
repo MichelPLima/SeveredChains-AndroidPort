@@ -1,0 +1,975 @@
+From ca7792439e517c5a7d707cd6e743ad6aae0c2528 Mon Sep 17 00:00:00 2001
+From: MichelPLima <109321208+MichelPLima@users.noreply.github.com>
+Date: Wed, 25 Nov 2026 18:59:32 -0300
+Subject: [PATCH] Plataforma Android: janela, EGL e controle pela ponte do app
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Com -Dsc.platform=android, o GameEngine usa AndroidPlatformManager em
+vez do SdlPlatformManager (sem a propriedade, nada muda).
+
+- AndroidBridge: natives da ponte com o app Android (libscjvm.so,
+  caminho em -Dsc.android.bridge): Surface, contexto EGL GLES 3.2 e
+  fila de eventos de entrada
+- AndroidWindow: a Surface como janela; GlesApi; pausa enquanto o
+  Android não devolve a Surface (Home, tela apagada), sem perder o
+  contexto
+- AndroidPlatformManager: controle com a mesma lógica de bindings,
+  deadzones e estados do SdlPlatformManager; direcional pelos eixos
+  HAT; gatilhos analógicos (BRAKE/GAS e L2/R2 como reserva); toque
+  como mouse
+- AndroidInput: códigos do Android (KeyEvent/MotionEvent) para
+  InputButton/InputAxis
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/main/java/legend/core/GameEngine.java     |   4 +-
+ .../legend/core/platform/AndroidBridge.java   |  57 ++
+ .../legend/core/platform/AndroidInput.java    | 105 ++++
+ .../core/platform/AndroidPlatformManager.java | 543 ++++++++++++++++++
+ .../legend/core/platform/AndroidWindow.java   | 184 ++++++
+ 5 files changed, 892 insertions(+), 1 deletion(-)
+ create mode 100644 src/main/java/legend/core/platform/AndroidBridge.java
+ create mode 100644 src/main/java/legend/core/platform/AndroidInput.java
+ create mode 100644 src/main/java/legend/core/platform/AndroidPlatformManager.java
+ create mode 100644 src/main/java/legend/core/platform/AndroidWindow.java
+
+diff --git a/src/main/java/legend/core/GameEngine.java b/src/main/java/legend/core/GameEngine.java
+index 422cd0b10..16193d182 100644
+--- a/src/main/java/legend/core/GameEngine.java
++++ b/src/main/java/legend/core/GameEngine.java
+@@ -12,6 +12,7 @@ import legend.core.gpu.Gpu;
+ import legend.core.gte.Gte;
+ import legend.core.gte.MV;
+ import legend.core.lang.I18nText;
++import legend.core.platform.AndroidPlatformManager;
+ import legend.core.platform.PlatformManager;
+ import legend.core.platform.SdlPlatformManager;
+ import legend.core.platform.WindowEvents;
+@@ -102,7 +103,8 @@ public final class GameEngine {
+   public static final ConfigCollection CONFIG = new ConfigCollection();
+   public static final SaveManager SAVES = new SaveManager(SaveVersion.V10, V10Serializer::toV10);
+ 
+-  public static final PlatformManager PLATFORM = new SdlPlatformManager();
++  /** -Dsc.platform=android: window and input over the Android app's Surface (Android port). SDL3 otherwise. */
++  public static final PlatformManager PLATFORM = "android".equals(System.getProperty("sc.platform")) ? new AndroidPlatformManager() : new SdlPlatformManager();
+   public static final RenderEngine RENDERER = new RenderEngine();
+ 
+   public static final FontManager FONTS = new FontManager();
+diff --git a/src/main/java/legend/core/platform/AndroidBridge.java b/src/main/java/legend/core/platform/AndroidBridge.java
+new file mode 100644
+index 000000000..fed6ac037
+--- /dev/null
++++ b/src/main/java/legend/core/platform/AndroidBridge.java
+@@ -0,0 +1,57 @@
++package legend.core.platform;
++
++/**
++ * Native side of the Android port (libscjvm.so, file ponte.c in SeveredChains-Android).
++ *
++ * <p>The Android app (ART) and the game (HotSpot) run in the same process and load the same library from the same path, so the
++ * dynamic linker returns the same copy: both sides see the same window, EGL context and event queue. The app hands over the
++ * Surface, its size and the input events; this class creates the GLES 3.2 context on the game's render thread and reads the events.</p>
++ *
++ * <p>The library path comes from {@code -Dsc.android.bridge}, set by the app.</p>
++ */
++public final class AndroidBridge {
++  public static final int EVENT_KEY = 1;
++  public static final int EVENT_AXIS = 2;
++  public static final int EVENT_TOUCH = 3;
++
++  static {
++    System.load(System.getProperty("sc.android.bridge"));
++  }
++
++  private AndroidBridge() { }
++
++  /** Creates the EGL display/context (GLES 3.2) and the surface, waiting for the Android Surface. Must run on the render thread. */
++  public static native boolean createContext();
++
++  public static native boolean swapBuffers();
++
++  /** Android wants the Surface back (Home, screen off): stop drawing and call {@link #releaseSurface()}. */
++  public static native boolean surfaceLost();
++
++  /** Releases the EGL surface; the context (textures, shaders) stays alive. */
++  public static native void releaseSurface();
++
++  /** Waits for a new Surface and recreates the EGL surface. Returns false if the app is closing. */
++  public static native boolean recreateSurface();
++
++  public static native void destroyContext();
++
++  public static native boolean isContextCurrent();
++
++  public static native int width();
++
++  public static native int height();
++
++  /** The Activity is finishing (Back button): the game should close. */
++  public static native boolean shouldQuit();
++
++  /**
++   * Takes one event from the queue. Returns its type (0 = empty) and fills ints = {code, action}, floats = {value, value2}.
++   * <ul>
++   *   <li>{@link #EVENT_KEY}: code = Android KeyEvent key code, action = KeyEvent action, value = device id</li>
++   *   <li>{@link #EVENT_AXIS}: code = Android MotionEvent axis, value = axis value</li>
++   *   <li>{@link #EVENT_TOUCH}: code = MotionEvent action, value/value2 = x/y in pixels</li>
++   * </ul>
++   */
++  public static native int nextEvent(int[] ints, float[] floats);
++}
+diff --git a/src/main/java/legend/core/platform/AndroidInput.java b/src/main/java/legend/core/platform/AndroidInput.java
+new file mode 100644
+index 000000000..4d4627255
+--- /dev/null
++++ b/src/main/java/legend/core/platform/AndroidInput.java
+@@ -0,0 +1,105 @@
++package legend.core.platform;
++
++import legend.core.platform.input.InputAxis;
++import legend.core.platform.input.InputButton;
++
++/**
++ * Android gamepad codes (android.view.KeyEvent / android.view.MotionEvent constants) to Severed Chains inputs.
++ *
++ * <p>Measured on the AYN Odin 2 Portal: the d-pad arrives as the HAT axes, L2/R2 arrive both as buttons and as trigger axes
++ * (repeated on BRAKE/GAS), the right stick is Z/RZ.</p>
++ */
++public final class AndroidInput {
++  private AndroidInput() { }
++
++  // KeyEvent.KEYCODE_*
++  public static final int KEYCODE_DPAD_UP = 19;
++  public static final int KEYCODE_DPAD_DOWN = 20;
++  public static final int KEYCODE_DPAD_LEFT = 21;
++  public static final int KEYCODE_DPAD_RIGHT = 22;
++  public static final int KEYCODE_BUTTON_A = 96;
++  public static final int KEYCODE_BUTTON_B = 97;
++  public static final int KEYCODE_BUTTON_X = 99;
++  public static final int KEYCODE_BUTTON_Y = 100;
++  public static final int KEYCODE_BUTTON_L1 = 102;
++  public static final int KEYCODE_BUTTON_R1 = 103;
++  public static final int KEYCODE_BUTTON_L2 = 104;
++  public static final int KEYCODE_BUTTON_R2 = 105;
++  public static final int KEYCODE_BUTTON_THUMBL = 106;
++  public static final int KEYCODE_BUTTON_THUMBR = 107;
++  public static final int KEYCODE_BUTTON_START = 108;
++  public static final int KEYCODE_BUTTON_SELECT = 109;
++  public static final int KEYCODE_BUTTON_MODE = 110;
++
++  // KeyEvent.ACTION_*
++  public static final int ACTION_DOWN = 0;
++  public static final int ACTION_UP = 1;
++
++  // MotionEvent.AXIS_*
++  public static final int AXIS_X = 0;
++  public static final int AXIS_Y = 1;
++  public static final int AXIS_Z = 11;
++  public static final int AXIS_RZ = 14;
++  public static final int AXIS_HAT_X = 15;
++  public static final int AXIS_HAT_Y = 16;
++  public static final int AXIS_LTRIGGER = 17;
++  public static final int AXIS_RTRIGGER = 18;
++  public static final int AXIS_GAS = 22;
++  public static final int AXIS_BRAKE = 23;
++
++  /** Highest axis code we track */
++  public static final int MAX_AXIS = 47;
++
++  /** @return the button for an Android key code, or null if it isn't a gamepad button we map */
++  public static InputButton getButton(final int keyCode) {
++    return switch(keyCode) {
++      case KEYCODE_DPAD_UP -> InputButton.DPAD_UP;
++      case KEYCODE_DPAD_DOWN -> InputButton.DPAD_DOWN;
++      case KEYCODE_DPAD_LEFT -> InputButton.DPAD_LEFT;
++      case KEYCODE_DPAD_RIGHT -> InputButton.DPAD_RIGHT;
++      case KEYCODE_BUTTON_A -> InputButton.A;
++      case KEYCODE_BUTTON_B -> InputButton.B;
++      case KEYCODE_BUTTON_X -> InputButton.X;
++      case KEYCODE_BUTTON_Y -> InputButton.Y;
++      case KEYCODE_BUTTON_L1 -> InputButton.LEFT_BUMPER;
++      case KEYCODE_BUTTON_R1 -> InputButton.RIGHT_BUMPER;
++      case KEYCODE_BUTTON_THUMBL -> InputButton.LEFT_STICK;
++      case KEYCODE_BUTTON_THUMBR -> InputButton.RIGHT_STICK;
++      case KEYCODE_BUTTON_START -> InputButton.START;
++      case KEYCODE_BUTTON_SELECT -> InputButton.SELECT;
++      case KEYCODE_BUTTON_MODE -> InputButton.GUIDE;
++      default -> null;
++    };
++  }
++
++  /** @return the stick/trigger axis for an Android axis code, or null (HAT and BRAKE/GAS are handled by the platform manager) */
++  public static InputAxis getAxis(final int axis) {
++    return switch(axis) {
++      case AXIS_X -> InputAxis.LEFT_X;
++      case AXIS_Y -> InputAxis.LEFT_Y;
++      case AXIS_Z -> InputAxis.RIGHT_X;
++      case AXIS_RZ -> InputAxis.RIGHT_Y;
++      case AXIS_LTRIGGER -> InputAxis.LEFT_TRIGGER;
++      case AXIS_RTRIGGER -> InputAxis.RIGHT_TRIGGER;
++      default -> null;
++    };
++  }
++
++  public static String getButtonName(final InputButton button) {
++    return switch(button) {
++      case LEFT_BUMPER -> "L1";
++      case RIGHT_BUMPER -> "R1";
++      case LEFT_STICK -> "L3";
++      case RIGHT_STICK -> "R3";
++      default -> button.name();
++    };
++  }
++
++  public static String getAxisName(final InputAxis axis) {
++    return switch(axis) {
++      case LEFT_TRIGGER -> "L2";
++      case RIGHT_TRIGGER -> "R2";
++      default -> axis.name();
++    };
++  }
++}
+diff --git a/src/main/java/legend/core/platform/AndroidPlatformManager.java b/src/main/java/legend/core/platform/AndroidPlatformManager.java
+new file mode 100644
+index 000000000..1e52920d3
+--- /dev/null
++++ b/src/main/java/legend/core/platform/AndroidPlatformManager.java
+@@ -0,0 +1,543 @@
++package legend.core.platform;
++
++import legend.core.platform.input.AxisInputActivation;
++import legend.core.platform.input.ButtonInputActivation;
++import legend.core.platform.input.InputAction;
++import legend.core.platform.input.InputActionState;
++import legend.core.platform.input.InputAxis;
++import legend.core.platform.input.InputAxisDirection;
++import legend.core.platform.input.InputBinding;
++import legend.core.platform.input.InputBindings;
++import legend.core.platform.input.InputButton;
++import legend.core.platform.input.InputClass;
++import legend.core.platform.input.InputGamepadType;
++import legend.core.platform.input.InputKey;
++import legend.core.platform.input.InputMod;
++import legend.game.modding.events.input.InputPressedEvent;
++import legend.game.modding.events.input.InputReleasedEvent;
++import org.apache.logging.log4j.LogManager;
++import org.apache.logging.log4j.Logger;
++import org.apache.logging.log4j.Marker;
++import org.apache.logging.log4j.MarkerManager;
++
++import java.util.Collection;
++import java.util.EnumMap;
++import java.util.EnumSet;
++import java.util.HashMap;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Map;
++import java.util.Set;
++
++import static legend.core.GameEngine.CONFIG;
++import static legend.core.GameEngine.EVENTS;
++import static legend.game.modding.coremod.CoreMod.MENU_INNER_DEADZONE_CONFIG;
++import static legend.game.modding.coremod.CoreMod.MENU_OUTER_DEADZONE_CONFIG;
++import static legend.game.modding.coremod.CoreMod.MOVEMENT_INNER_DEADZONE_CONFIG;
++import static legend.game.modding.coremod.CoreMod.MOVEMENT_OUTER_DEADZONE_CONFIG;
++
++/**
++ * Platform for the Android port: one fullscreen window on the app's Surface and the device's gamepad, both through
++ * {@link AndroidBridge}. Selected with {@code -Dsc.platform=android}.
++ *
++ * <p>The gamepad logic follows {@link SdlPlatformManager} (same deadzones, bindings and action states), with Android's codes
++ * mapped by {@link AndroidInput}. All gamepads are treated as one.</p>
++ */
++public class AndroidPlatformManager extends PlatformManager {
++  private static final Logger LOGGER = LogManager.getFormatterLogger(AndroidPlatformManager.class);
++  private static final Marker INPUT_MARKER = MarkerManager.getMarker("INPUT");
++  private static final Marker ACTIONS_MARKER = MarkerManager.getMarker("ACTIONS");
++
++  private static final Object INPUT_LOCK = new Object();
++  private static final Set<InputMod> NO_MODS = EnumSet.noneOf(InputMod.class);
++
++  private AndroidWindow window;
++
++  private final int[] eventInts = new int[2];
++  private final float[] eventFloats = new float[2];
++
++  private final Set<InputAction> pressed = new HashSet<>();
++  private final Map<InputAction, InputActionState> actionStates = new HashMap<>();
++  private final Map<InputAction, AxisInputState> axisActionStates = new HashMap<>();
++  private boolean clearActionStates;
++
++  /** Last value per Android axis: the app sends every axis on each motion event, we only want changes */
++  private final float[] lastAxisValue = new float[AndroidInput.MAX_AXIS + 1];
++  private final Map<InputButton, Boolean> buttonsDown = new EnumMap<>(InputButton.class);
++  private int hatX;
++  private int hatY;
++  /** Set once LTRIGGER/RTRIGGER report a value; until then BRAKE/GAS and the L2/R2 buttons stand in for the triggers */
++  private boolean triggerAxesSeen;
++
++  @Override
++  public void init() {
++    LOGGER.info("Android platform");
++  }
++
++  @Override
++  public boolean isContextCurrent() {
++    return AndroidBridge.isContextCurrent();
++  }
++
++  @Override
++  public boolean hasGamepad() {
++    return true;
++  }
++
++  @Override
++  public InputGamepadType getGamepadType() {
++    return InputGamepadType.STANDARD;
++  }
++
++  @Override
++  public int getMouseButton(final int index) {
++    // Same numbering as SDL (left = 1)
++    return 1 + index;
++  }
++
++  @Override
++  public String[] listDisplays() {
++    return new String[] {"Android"};
++  }
++
++  @Override
++  protected Window createWindow(final String title, final int width, final int height) {
++    if(this.window != null) {
++      throw new IllegalStateException("Android only has one window");
++    }
++
++    this.window = new AndroidWindow(this, title, width, height);
++    return this.window;
++  }
++
++  @Override
++  protected void removeWindows(final Collection<Window> windows) {
++    super.removeWindows(windows);
++
++    if(windows.contains(this.window)) {
++      this.window = null;
++    }
++  }
++
++  @Override
++  public Window getLastWindow() {
++    return this.window;
++  }
++
++  @Override
++  public void resetActionStates() {
++    this.clearActionStates = true;
++  }
++
++  @Override
++  protected void tickInput() {
++    final AndroidWindow window = this.window;
++
++    if(window == null) {
++      return;
++    }
++
++    if(AndroidBridge.shouldQuit()) {
++      window.close();
++    }
++
++    if(window.updateSize()) {
++      window.events().onResize(window.getWidth(), window.getHeight());
++    }
++
++    synchronized(INPUT_LOCK) {
++      int type;
++      while((type = AndroidBridge.nextEvent(this.eventInts, this.eventFloats)) != 0) {
++        switch(type) {
++          case AndroidBridge.EVENT_KEY -> this.handleKey(window, this.eventInts[0], this.eventInts[1]);
++          case AndroidBridge.EVENT_AXIS -> this.handleAndroidAxis(window, this.eventInts[0], this.eventFloats[0]);
++          case AndroidBridge.EVENT_TOUCH -> this.handleTouch(window, this.eventInts[0], this.eventFloats[0], this.eventFloats[1]);
++        }
++      }
++    }
++
++    if(window.hasFocus) {
++      for(final var entry : this.actionStates.entrySet()) {
++        final InputAction action = entry.getKey();
++        final InputActionState state = entry.getValue();
++
++        if(state.repeat()) {
++          LOGGER.info(ACTIONS_MARKER, "Triggering repeat input action %s", action);
++          window.events().onInputActionPressed(action, true);
++          EVENTS.postEvent(new InputPressedEvent(action, true));
++        }
++      }
++    }
++
++    if(this.clearActionStates) {
++      this.clearActionStates = false;
++      this.actionStates.clear();
++      this.axisActionStates.clear();
++    }
++  }
++
++  private void handleKey(final AndroidWindow window, final int keyCode, final int action) {
++    final boolean down = action == AndroidInput.ACTION_DOWN;
++    LOGGER.info(INPUT_MARKER, "Key %s %d", down ? "down" : "up", keyCode);
++
++    if(keyCode == AndroidInput.KEYCODE_BUTTON_L2 || keyCode == AndroidInput.KEYCODE_BUTTON_R2) {
++      // Gamepads with analog triggers also send these as buttons; only use them when there are no trigger axes
++      if(!this.triggerAxesSeen) {
++        this.handleAxis(window, keyCode == AndroidInput.KEYCODE_BUTTON_L2 ? InputAxis.LEFT_TRIGGER : InputAxis.RIGHT_TRIGGER, down ? 1.0f : 0.0f);
++      }
++
++      return;
++    }
++
++    final InputButton button = AndroidInput.getButton(keyCode);
++
++    if(button == null) {
++      LOGGER.info(INPUT_MARKER, "Unmapped Android key %d", keyCode);
++      return;
++    }
++
++    if(down) {
++      this.pressButton(window, button);
++    } else {
++      this.releaseButton(window, button);
++    }
++  }
++
++  private void handleAndroidAxis(final AndroidWindow window, final int axisCode, final float value) {
++    if(axisCode < 0 || axisCode > AndroidInput.MAX_AXIS || this.lastAxisValue[axisCode] == value) {
++      return;
++    }
++
++    this.lastAxisValue[axisCode] = value;
++
++    switch(axisCode) {
++      case AndroidInput.AXIS_HAT_X -> {
++        this.hatX = this.updateHat(window, this.hatX, Math.round(value), InputButton.DPAD_LEFT, InputButton.DPAD_RIGHT);
++        return;
++      }
++
++      case AndroidInput.AXIS_HAT_Y -> {
++        this.hatY = this.updateHat(window, this.hatY, Math.round(value), InputButton.DPAD_UP, InputButton.DPAD_DOWN);
++        return;
++      }
++
++      case AndroidInput.AXIS_LTRIGGER, AndroidInput.AXIS_RTRIGGER -> {
++        if(value != 0.0f) {
++          this.triggerAxesSeen = true;
++        }
++      }
++
++      case AndroidInput.AXIS_BRAKE, AndroidInput.AXIS_GAS -> {
++        if(!this.triggerAxesSeen) {
++          this.handleAxis(window, axisCode == AndroidInput.AXIS_BRAKE ? InputAxis.LEFT_TRIGGER : InputAxis.RIGHT_TRIGGER, value);
++        }
++
++        return;
++      }
++    }
++
++    final InputAxis axis = AndroidInput.getAxis(axisCode);
++
++    if(axis != null) {
++      this.handleAxis(window, axis, value);
++    }
++  }
++
++  /** D-pad as a HAT axis: -1/0/1 per direction */
++  private int updateHat(final AndroidWindow window, final int oldValue, final int newValue, final InputButton negative, final InputButton positive) {
++    if(oldValue == newValue) {
++      return oldValue;
++    }
++
++    if(oldValue < 0) {
++      this.releaseButton(window, negative);
++    } else if(oldValue > 0) {
++      this.releaseButton(window, positive);
++    }
++
++    if(newValue < 0) {
++      this.pressButton(window, negative);
++    } else if(newValue > 0) {
++      this.pressButton(window, positive);
++    }
++
++    return Integer.signum(newValue);
++  }
++
++  private void pressButton(final AndroidWindow window, final InputButton button) {
++    if(Boolean.TRUE.equals(this.buttonsDown.put(button, Boolean.TRUE)) || !window.hasFocus) {
++      return;
++    }
++
++    LOGGER.info(INPUT_MARKER, "Button down %s", button);
++    this.setWindowInputClass(window, InputClass.GAMEPAD);
++    window.events().onButtonPress(button, false);
++
++    final List<InputBinding<ButtonInputActivation>> bindings = InputBindings.getBindings(ButtonInputActivation.class);
++
++    for(int i = 0; i < bindings.size(); i++) {
++      final InputBinding<ButtonInputActivation> binding = bindings.get(i);
++
++      if(binding.activation.button == button) {
++        LOGGER.info(ACTIONS_MARKER, "Triggering press input action button %s -> %s", button, binding.action);
++        this.triggerBindingPress(window, binding);
++      }
++    }
++  }
++
++  private void releaseButton(final AndroidWindow window, final InputButton button) {
++    if(!Boolean.TRUE.equals(this.buttonsDown.remove(button))) {
++      return;
++    }
++
++    LOGGER.info(INPUT_MARKER, "Button up %s", button);
++    this.setWindowInputClass(window, InputClass.GAMEPAD);
++    window.events().onButtonRelease(button);
++
++    final List<InputBinding<ButtonInputActivation>> bindings = InputBindings.getBindings(ButtonInputActivation.class);
++
++    for(int i = 0; i < bindings.size(); i++) {
++      final InputBinding<ButtonInputActivation> binding = bindings.get(i);
++
++      if(binding.activation.button == button) {
++        LOGGER.info(ACTIONS_MARKER, "Triggering release input action button %s -> %s", button, binding.action);
++        this.triggerBindingRelease(window, binding);
++      }
++    }
++  }
++
++  /** Same math as {@link SdlPlatformManager} on SDL's int scale (sticks -0x8000..0x7fff, triggers 0..0x7fff) */
++  private void handleAxis(final AndroidWindow window, final InputAxis axis, final float floatValue) {
++    if(!window.hasFocus) {
++      return;
++    }
++
++    final int value = java.lang.Math.clamp(java.lang.Math.round(floatValue * 0x7fff), -0x8000, 0x7fff);
++
++    final float menuInnerDeadzone = CONFIG.getConfig(MENU_INNER_DEADZONE_CONFIG.get());
++    final float menuOuterDeadzone = CONFIG.getConfig(MENU_OUTER_DEADZONE_CONFIG.get());
++    final float movementInnerDeadzone = CONFIG.getConfig(MOVEMENT_INNER_DEADZONE_CONFIG.get());
++    final float movementOuterDeadzone = CONFIG.getConfig(MOVEMENT_OUTER_DEADZONE_CONFIG.get());
++    final float minInner = Math.min(menuInnerDeadzone, movementInnerDeadzone);
++
++    if(Math.abs(value) >= minInner * 0x7fff) {
++      this.setWindowInputClass(window, InputClass.GAMEPAD);
++      final float menuValue = Math.min(1.0f, (Math.abs(value) / (float)0x7fff - menuInnerDeadzone) / (Math.abs(menuOuterDeadzone - menuInnerDeadzone)));
++      final float movementValue = Math.min(1.0f, (Math.abs(value) / (float)0x7fff - movementInnerDeadzone) / (Math.abs(movementOuterDeadzone - movementInnerDeadzone)));
++      window.events().onAxis(axis, InputAxisDirection.getDirection(value), menuValue, movementValue);
++    }
++
++    final List<InputBinding<AxisInputActivation>> axisBindings = InputBindings.getBindings(AxisInputActivation.class);
++
++    for(int i = 0; i < axisBindings.size(); i++) {
++      final InputBinding<AxisInputActivation> binding = axisBindings.get(i);
++
++      if(binding.activation.axis == axis) {
++        final InputAxisDirection direction = InputAxisDirection.getDirection(value);
++        float actionValue = 0.0f;
++
++        if(binding.activation.direction == direction) {
++          final float inner;
++          final float outer;
++          if(binding.action.useMovementDeadzone) {
++            inner = movementInnerDeadzone;
++            outer = movementOuterDeadzone;
++          } else {
++            inner = menuInnerDeadzone;
++            outer = menuOuterDeadzone;
++          }
++
++          final float deadzoneValue = Math.min(1.0f, (Math.abs(value) / (float)0x7fff - inner) / (Math.abs(outer - inner)));
++          if(deadzoneValue > 0.0f) {
++            actionValue = deadzoneValue * Math.signum(value);
++          }
++        }
++
++        final AxisInputState axisState = this.axisActionStates.computeIfAbsent(binding.action, key -> new AxisInputState());
++        axisState.update(axis, binding.activation.direction, actionValue);
++        this.applyAxisActionValue(window, binding.action, axisState.getValue());
++
++        if(axisState.isEmpty()) {
++          this.axisActionStates.remove(binding.action);
++        }
++      }
++    }
++  }
++
++  private void applyAxisActionValue(final AndroidWindow window, final InputAction action, final float value) {
++    final InputActionState state = this.getInputActionState(action);
++
++    if(value != 0.0f) {
++      if(!state.isHeld()) {
++        LOGGER.info(ACTIONS_MARKER, "Triggering press input action axis -> %s", action);
++        this.pressed.add(action);
++        window.events().onInputActionPressed(action, false);
++        state.press();
++        EVENTS.postEvent(new InputPressedEvent(action, false));
++      }
++
++      state.axis(value);
++    } else if(state.isHeld() && state.getAxis() != 0.0f) {
++      LOGGER.info(ACTIONS_MARKER, "Triggering release input action axis -> %s", action);
++      window.events().onInputActionReleased(action);
++      state.release();
++      EVENTS.postEvent(new InputReleasedEvent(action));
++    }
++  }
++
++  private void handleTouch(final AndroidWindow window, final int action, final float x, final float y) {
++    LOGGER.info(INPUT_MARKER, "Touch %d at (%.0f, %.0f)", action, x, y);
++    window.events().onMouseMove(x, y);
++
++    if(action == AndroidInput.ACTION_DOWN) {
++      window.events().onMousePress(this.getMouseButton(0), NO_MODS);
++    } else if(action == AndroidInput.ACTION_UP) {
++      window.events().onMouseRelease(this.getMouseButton(0), NO_MODS);
++    }
++  }
++
++  /** Called when the Surface goes away: release everything that's held so nothing stays stuck after resuming */
++  void releaseHeldInputs(final AndroidWindow window) {
++    synchronized(INPUT_LOCK) {
++      this.pressed.clear();
++      this.buttonsDown.clear();
++      this.hatX = 0;
++      this.hatY = 0;
++      java.util.Arrays.fill(this.lastAxisValue, 0.0f);
++
++      for(final var entry : this.actionStates.entrySet()) {
++        final InputAction action = entry.getKey();
++        final InputActionState state = entry.getValue();
++
++        if(state.isHeld()) {
++          LOGGER.info(ACTIONS_MARKER, "Triggering release input action %s", action);
++          window.events().onInputActionReleased(action);
++          state.release();
++          EVENTS.postEvent(new InputReleasedEvent(action));
++        }
++      }
++
++      this.axisActionStates.clear();
++    }
++  }
++
++  private void triggerBindingPress(final AndroidWindow window, final InputBinding<?> binding) {
++    this.pressed.add(binding.action);
++    window.events().onInputActionPressed(binding.action, false);
++    this.getInputActionState(binding.action).press();
++    EVENTS.postEvent(new InputPressedEvent(binding.action, false));
++  }
++
++  private void triggerBindingRelease(final AndroidWindow window, final InputBinding<?> binding) {
++    window.events().onInputActionReleased(binding.action);
++    this.getInputActionState(binding.action).release();
++    EVENTS.postEvent(new InputReleasedEvent(binding.action));
++  }
++
++  @Override
++  public void clearPressed() {
++    synchronized(INPUT_LOCK) {
++      this.pressed.clear();
++    }
++  }
++
++  //TODO vibration motor
++  @Override public void rumble(final float intensity, final int ms) { }
++  @Override public void rumble(final float bigIntensity, final float smallIntensity, final int ms) { }
++  @Override public void adjustRumble(final float intensity, final int ms) { }
++  @Override public void adjustRumble(final float bigIntensity, final float smallIntensity, final int ms) { }
++  @Override public void stopRumble() { }
++
++  private InputActionState getInputActionState(final InputAction action) {
++    return this.actionStates.computeIfAbsent(action, key -> new InputActionState());
++  }
++
++  @Override
++  public boolean isActionPressed(final InputAction action) {
++    return this.pressed.contains(action);
++  }
++
++  @Override
++  public boolean isActionRepeat(final InputAction action) {
++    return this.getInputActionState(action).isRepeat();
++  }
++
++  @Override
++  public boolean isActionHeld(final InputAction action) {
++    return this.getInputActionState(action).isHeld();
++  }
++
++  @Override
++  public float getAxis(final InputAction action) {
++    return this.getInputActionState(action).getAxis();
++  }
++
++  private void setWindowInputClass(final AndroidWindow window, final InputClass classification) {
++    if(window.currentInputClass != classification) {
++      window.currentInputClass = classification;
++      window.events().onInputClassChanged(classification);
++    }
++  }
++
++  @Override
++  public String getKeyName(final InputKey key) {
++    return key.name();
++  }
++
++  @Override
++  public String getScancodeName(final InputKey key) {
++    return key.name();
++  }
++
++  @Override
++  public String getButtonName(final InputButton button) {
++    return AndroidInput.getButtonName(button);
++  }
++
++  @Override
++  public String getAxisName(final InputAxis axis) {
++    return AndroidInput.getAxisName(axis);
++  }
++
++  //TODO open through the app (Intent)
++  @Override
++  public void openUrl(final String url) {
++    LOGGER.info("Open URL (not supported on Android yet): %s", url);
++  }
++
++  @Override
++  public String getPasteText() {
++    return "";
++  }
++
++  /** Strongest value among the axis directions bound to one action */
++  private static final class AxisInputState {
++    private final Map<Integer, Float> values = new HashMap<>();
++
++    void update(final InputAxis axis, final InputAxisDirection direction, final float value) {
++      final int key = axis.ordinal() << 1 | direction.ordinal();
++
++      if(value == 0.0f) {
++        this.values.remove(key);
++      } else {
++        this.values.put(key, value);
++      }
++    }
++
++    float getValue() {
++      float value = 0.0f;
++
++      for(final float candidate : this.values.values()) {
++        if(Math.abs(candidate) > Math.abs(value)) {
++          value = candidate;
++        }
++      }
++
++      return value;
++    }
++
++    boolean isEmpty() {
++      return this.values.isEmpty();
++    }
++  }
++}
+diff --git a/src/main/java/legend/core/platform/AndroidWindow.java b/src/main/java/legend/core/platform/AndroidWindow.java
+new file mode 100644
+index 000000000..f7215c8ae
+--- /dev/null
++++ b/src/main/java/legend/core/platform/AndroidWindow.java
+@@ -0,0 +1,184 @@
++package legend.core.platform;
++
++import legend.core.platform.input.InputClass;
++import legend.core.renderer.RenderApi;
++import legend.core.renderer.opengles.GlesApi;
++import org.apache.logging.log4j.LogManager;
++import org.apache.logging.log4j.Logger;
++import org.lwjgl.opengles.GLES;
++import org.lwjgl.opengles.GLESCapabilities;
++
++import java.nio.file.Path;
++
++/**
++ * The Android Surface as a game window. The EGL context (GLES 3.2) is created by {@link AndroidBridge} on the render thread; LWJGL
++ * loads the GLES functions from the system libGLESv2.so ({@code -Dorg.lwjgl.opengles.libname}).
++ *
++ * <p>When Android takes the Surface away (Home, screen off), the render thread releases the EGL surface and blocks until a new
++ * Surface arrives. The game logic runs from the draw callback, so it pauses too. The context survives, so textures and shaders
++ * don't need to be recreated.</p>
++ */
++public class AndroidWindow extends Window {
++  private static final Logger LOGGER = LogManager.getFormatterLogger(AndroidWindow.class);
++
++  private final AndroidPlatformManager manager;
++  private final RenderApi renderApi;
++  private final Action render;
++
++  private int width;
++  private int height;
++  boolean hasFocus = true;
++  private boolean shouldClose;
++
++  /** The last way the user interacted with this window */
++  InputClass currentInputClass = InputClass.GAMEPAD;
++
++  public AndroidWindow(final AndroidPlatformManager manager, final String title, final int width, final int height) {
++    this.manager = manager;
++
++    LOGGER.info("Initializing OpenGLES 3.2 (Android EGL)...");
++
++    if(!AndroidBridge.createContext()) {
++      throw new RuntimeException("Failed to create an OpenGL ES 3.2 context on the Android surface");
++    }
++
++    final GLESCapabilities caps = GLES.createCapabilities();
++
++    if(!caps.GLES32) {
++      AndroidBridge.destroyContext();
++      throw new RuntimeException("This device does not support OpenGL ES 3.2");
++    }
++
++    this.renderApi = new GlesApi();
++    this.updateSize();
++    LOGGER.info("Android surface %dx%d", this.width, this.height);
++
++    this.render = this.manager.addAction(new Action(this::tick, 60));
++  }
++
++  @Override
++  public RenderApi getRenderApi() {
++    return this.renderApi;
++  }
++
++  @Override
++  protected void destroy() {
++    this.manager.removeAction(this.render);
++    this.events().onClose();
++    AndroidBridge.destroyContext();
++  }
++
++  /** @return true if the size changed */
++  boolean updateSize() {
++    final int w = Math.max(1, AndroidBridge.width());
++    final int h = Math.max(1, AndroidBridge.height());
++
++    if(w != this.width || h != this.height) {
++      this.width = w;
++      this.height = h;
++      return true;
++    }
++
++    return false;
++  }
++
++  @Override
++  protected boolean shouldClose() {
++    return this.shouldClose;
++  }
++
++  @Override
++  public void show() {
++    this.updateSize();
++    this.events().onResize(this.width, this.height);
++  }
++
++  @Override
++  public void close() {
++    this.shouldClose = true;
++  }
++
++  // Always fullscreen, single display
++  @Override public void updateMonitor() { }
++  @Override public void makeFullscreen() { }
++  @Override public void makeWindowed() { }
++  @Override public void centerWindow() { }
++  @Override public void setTitle(final String title) { }
++
++  @Override
++  public int getWidth() {
++    return this.width;
++  }
++
++  @Override
++  public int getHeight() {
++    return this.height;
++  }
++
++  @Override
++  public boolean hasFocus() {
++    return this.hasFocus;
++  }
++
++  @Override
++  public InputClass getInputClass() {
++    return this.currentInputClass;
++  }
++
++  //TODO on-screen keyboard
++  @Override public void startTextInput() { }
++  @Override public void stopTextInput() { }
++
++  // No mouse cursor
++  @Override public void disableCursor() { }
++  @Override public void showCursor() { }
++  @Override public void hideCursor() { }
++  @Override public void useNormalCursor() { }
++  @Override public void usePointerCursor() { }
++  @Override public void setWindowIcon(final Path path) { }
++
++  @Override
++  public void setFpsLimit(final int limit) {
++    this.render.setExpectedFps(limit);
++  }
++
++  @Override
++  public int getFpsLimit() {
++    return this.render.getExpectedFps();
++  }
++
++  private void tick() {
++    if(AndroidBridge.surfaceLost() && !this.waitForSurface()) {
++      return;
++    }
++
++    AndroidBridge.swapBuffers();
++    this.events().onDraw();
++    this.manager.clearPressed();
++  }
++
++  /** Releases the EGL surface and blocks until Android gives a new one. Returns false if the app is closing. */
++  private boolean waitForSurface() {
++    LOGGER.info("Android surface lost, pausing");
++    this.hasFocus = false;
++    this.events().onFocus(false);
++    this.manager.releaseHeldInputs(this);
++    AndroidBridge.releaseSurface();
++
++    if(!AndroidBridge.recreateSurface()) {
++      LOGGER.info("App closing while paused");
++      this.close();
++      return false;
++    }
++
++    this.hasFocus = true;
++    this.events().onFocus(true);
++
++    if(this.updateSize()) {
++      this.events().onResize(this.width, this.height);
++    }
++
++    LOGGER.info("Android surface back (%dx%d), resuming", this.width, this.height);
++    return true;
++  }
++}
+-- 
+2.56.1.windows.1
+

@@ -3,7 +3,7 @@ package scandroid.m2;
 import org.lwjgl.opengles.GLES;
 import org.lwjgl.opengles.GLESCapabilities;
 import org.lwjgl.system.MemoryStack;
-import scandroid.ponte.Ponte;
+import legend.core.platform.AndroidBridge;
 
 import java.nio.FloatBuffer;
 import java.util.Map;
@@ -129,11 +129,11 @@ public final class Tela {
   public static void main(final String[] args) {
     System.out.println("== M2: Tela (LWJGL + GLES 3.2 na HotSpot) ==");
 
-    if(!Ponte.criarContexto()) {
+    if(!AndroidBridge.createContext()) {
       System.out.println("[FALHOU] não consegui criar o contexto EGL/GLES 3.2 (ver logcat tag scponte)");
       return;
     }
-    System.out.println("[OK]     contexto EGL criado, " + Ponte.largura() + "x" + Ponte.altura());
+    System.out.println("[OK]     contexto EGL criado, " + AndroidBridge.width() + "x" + AndroidBridge.height());
 
     final GLESCapabilities caps = GLES.createCapabilities();
     System.out.println("  GL_VENDOR    " + glGetString(GL_VENDOR));
@@ -148,7 +148,7 @@ public final class Tela {
     System.out.println(progDireto != 0 ? "[OK]     shaders 320 es compilados" : "[FALHOU] shaders 320 es");
     System.out.println(progGs != 0 ? "[OK]     geometry shader compilado e ligado (o jogo usa em tmd.gsh)" : "[FALHOU] geometry shader");
     if(progDireto == 0) {
-      Ponte.destruirContexto();
+      AndroidBridge.destroyContext();
       return;
     }
 
@@ -164,11 +164,11 @@ public final class Tela {
     int quadros = 0;
     final long inicio = System.nanoTime();
 
-    while(!Ponte.deveEncerrar()) {
+    while(!AndroidBridge.shouldQuit()) {
       int tipo;
-      while((tipo = Ponte.proximoEvento(ints, floats)) != 0) {
+      while((tipo = AndroidBridge.nextEvent(ints, floats)) != 0) {
         switch(tipo) {
-          case Ponte.EVENTO_TECLA -> {
+          case AndroidBridge.EVENT_KEY -> {
             final boolean desceu = ints[1] == 0;
             System.out.printf("tecla %s (%d) %s%n", TECLAS.getOrDefault(ints[0], "?"), ints[0], desceu ? "desceu" : "subiu");
             if(desceu) {
@@ -179,31 +179,31 @@ public final class Tela {
               }
             }
           }
-          case Ponte.EVENTO_EIXO -> {
+          case AndroidBridge.EVENT_AXIS -> {
             final int eixo = ints[0] & 63;
             if(Math.abs(floats[0] - ultimoEixo[eixo]) >= 0.25f || (floats[0] == 0 && ultimoEixo[eixo] != 0)) {
               ultimoEixo[eixo] = floats[0];
               System.out.printf("eixo %s (%d) = %.2f%n", EIXOS.getOrDefault(ints[0], "?"), ints[0], floats[0]);
             }
           }
-          case Ponte.EVENTO_TOQUE -> System.out.printf("toque ação=%d em (%.0f, %.0f)%n", ints[0], floats[0], floats[1]);
+          case AndroidBridge.EVENT_TOUCH -> System.out.printf("toque ação=%d em (%.0f, %.0f)%n", ints[0], floats[0], floats[1]);
           default -> { }
         }
       }
 
-      if(Ponte.janelaPerdida()) {
+      if(AndroidBridge.surfaceLost()) {
         System.out.println("Surface perdida (app em segundo plano): pausando");
-        Ponte.liberarSuperficie();
-        if(!Ponte.recriarSuperficie()) {
+        AndroidBridge.releaseSurface();
+        if(!AndroidBridge.recreateSurface()) {
           break;
         }
-        System.out.println("Surface recriada: " + Ponte.largura() + "x" + Ponte.altura() + " (contexto e shaders preservados)");
+        System.out.println("Surface recriada: " + AndroidBridge.width() + "x" + AndroidBridge.height() + " (contexto e shaders preservados)");
         ultimoFps = System.nanoTime();
         quadros = 0;
       }
 
-      final int w = Math.max(1, Ponte.largura());
-      final int h = Math.max(1, Ponte.altura());
+      final int w = Math.max(1, AndroidBridge.width());
+      final int h = Math.max(1, AndroidBridge.height());
       glViewport(0, 0, w, h);
       final float[] c = CORES[cor];
       glClearColor(c[0], c[1], c[2], 1.0f);
@@ -215,7 +215,7 @@ public final class Tela {
       glUniform2f(glGetUniformLocation(prog, "escala"), 0.8f * h / w, 0.8f);
       glDrawArrays(GL_TRIANGLES, 0, 3);
 
-      Ponte.trocarBuffers();
+      AndroidBridge.swapBuffers();
       quadros++;
 
       final long agora = System.nanoTime();
@@ -226,7 +226,7 @@ public final class Tela {
       }
     }
 
-    Ponte.destruirContexto();
+    AndroidBridge.destroyContext();
     System.out.println("== M2 encerrado ==");
   }
 

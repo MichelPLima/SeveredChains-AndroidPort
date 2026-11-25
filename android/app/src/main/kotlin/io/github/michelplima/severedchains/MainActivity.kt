@@ -12,13 +12,14 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         tela = TelaDeLog(this, "SC-Android · testes", listOf(
+            "M3b: Jogo (sem discos)" to { iniciar("M3b", TelaActivity::class.java, Jvm.CLASSE_DO_JOGO) },
             "M3a: Bibliotecas" to { iniciar("M3a", TelaActivity::class.java, "scandroid/m3/Bibliotecas") },
             "M2: Tela (GLES)" to { iniciar("M2", TelaActivity::class.java) },
             "M1: JVM" to { iniciar("M1", JvmActivity::class.java) },
             "Salvar log…" to { SalvarLog.pedir(this) },
             "Limpar log" to { Logs.limpar(this) },
         ))
-        tela.status("M3a: testa as bibliotecas do jogo (som de bipe, shaders do jogo na GPU). Tela verde = OK, vermelha = falha. Voltar sai.")
+        tela.status("M3b: abre o Severed Chains. Sem os discos ele deve parar na tela que pede os 4 discos. Voltar sai.")
     }
 
     override fun onResume() {

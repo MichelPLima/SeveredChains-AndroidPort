@@ -14,6 +14,10 @@ import java.util.Locale
  */
 object Logs {
     private val hora = SimpleDateFormat("HH:mm:ss.SSS", Locale.ROOT)
+    /** Cores ANSI do console do log4j (padrão %highlight do log4j2.xml do jogo) */
+    private val ansi = Regex("\u001B\\[[0-9;]*m")
+
+    private fun semAnsi(texto: String): String = texto.replace(ansi, "")
 
     fun pasta(ctx: Context): File = File(ctx.filesDir, "logs").apply { mkdirs() }
 
@@ -48,7 +52,7 @@ object Logs {
         val tam = f.length()
         f.inputStream().use { s ->
             if(tam > maxBytes) s.skip(tam - maxBytes)
-            return s.readBytes().toString(Charsets.UTF_8)
+            return semAnsi(s.readBytes().toString(Charsets.UTF_8))
         }
     }
 
@@ -59,7 +63,7 @@ object Logs {
         val arquivos = pasta(ctx).listFiles()?.sortedBy { it.name }.orEmpty()
         for(f in arquivos) {
             append("==== ${f.name} (${f.length()} bytes) ====\n")
-            append(f.readText()).append("\n")
+            append(semAnsi(f.readText())).append("\n")
         }
     }
 

@@ -21,7 +21,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 
 /**
- * M2, processo ":jvm": tela cheia com uma SurfaceView. A HotSpot (scandroid.m2.Tela) desenha nela
+ * Processo ":jvm": tela cheia com uma SurfaceView. A HotSpot (o jogo ou um teste) desenha nela
  * pela ponte nativa (ponte.c); controle e toque são repassados para a fila de eventos da ponte.
  * Sair: botão Voltar do sistema.
  */
@@ -68,8 +68,8 @@ class TelaActivity : Activity(), SurfaceHolder.Callback {
 
         if(Native.estado() == Native.PARADO) {
             val classe = intent.getStringExtra(EXTRA_CLASSE) ?: "scandroid/m2/Tela"
-            Logs.escrever(this, "==== Novo teste em tela cheia: $classe ====")
-            val r = Jvm.iniciar(this, classe)
+            Logs.escrever(this, "==== Tela cheia: $classe ====")
+            val r = if(classe == Jvm.CLASSE_DO_JOGO) Jvm.iniciarJogo(this) else Jvm.iniciar(this, classe)
             if(r != 0) Logs.escrever(this, "Falha ao iniciar: ${Native.descreverErro(r)}")
         }
     }
@@ -103,7 +103,7 @@ class TelaActivity : Activity(), SurfaceHolder.Callback {
     override fun onDestroy() {
         super.onDestroy()
         if(isFinishing) {
-            Logs.escrever(this, "Tela M2 fechada; encerrando o processo :jvm")
+            Logs.escrever(this, "Tela fechada; encerrando o processo :jvm")
             Process.killProcess(Process.myPid())
         }
     }
