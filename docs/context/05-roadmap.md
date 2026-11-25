@@ -25,9 +25,9 @@ Marcos do APK (cada um gera um APK instalado manualmente no Odin, com log na tel
 | M4 Completo | Áudio, FMV, Discord off, pausa/retomada, saves | 4 |
 | M5 Launcher | UI, mods, opções | 5 |
 
-## Fase 2 (Spike 1): JVM dentro do APK
-- [ ] OpenJDK 25 aarch64 para Android (reaproveitar receitas do `android-openjdk-build-multiarch`)
-- [ ] App mínimo que sobe a JVM via JNI e roda um `Hello` + `System.getProperty("os.arch")`
+## Fase 2 (Spike 1): JVM dentro do APK ✅ (2026-11-25, marco M1)
+- [x] OpenJDK 25 aarch64 para Android (reaproveitar receitas do `android-openjdk-build-multiarch`)
+- [x] App mínimo que sobe a JVM via JNI e roda um `Hello` + `System.getProperty("os.arch")`
 - **Pronto quando:** HotSpot rodando dentro do processo do app
 
 ## Fase 3 (Spike 2): Janela, GLES e entrada
