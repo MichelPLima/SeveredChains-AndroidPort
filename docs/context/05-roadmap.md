@@ -32,12 +32,12 @@ Marcos do APK (cada um gera um APK instalado manualmente no Odin, com log na tel
 
 ## Fase 3 (Spike 2): Janela, GLES e entrada
 - [x] Decidir SDL3 vs shim (`PlatformManager`) e registrar em 04-decisoes.md (shim, 2026-11-25)
-- [ ] Natives LWJGL 3.4.3 android-arm64 (core, opengles, openal, opus, stb, assimp, shaderc, spvc): core + opengles OK no M2 (2026-11-25)
+- [x] Natives LWJGL 3.4.3 android-arm64: core + opengles OK no M2; openal, opus, stb, shaderc, spvc OK no M3a (2026-11-25). assimp não é usado pelo upstream
 - [ ] Tela título renderizando na Surface Android pelo caminho GlesApi (`-Dsc.renderer=gles`), sem erro de shader
 - **Pronto quando:** tela título com gamepad funcionando dentro do APK
 
 ## Fase 4: Jogo completo
-- [ ] Áudio (OpenAL Soft/AAudio)
+- [ ] Áudio (OpenAL Soft/OpenSL): biblioteca validada no M3a (bipe no Odin); falta o áudio do jogo
 - [ ] FMV (javacv/ffmpeg android-arm64)
 - [ ] Desligar Discord SDK no Android
 - [ ] Saves e config persistentes; ciclo de vida (pausa/retomar, sair sem corromper save)
