@@ -14,7 +14,12 @@ val shaRuntimeJre = "2d2ed1cb285ea31fc7cccd20956e68e304ff95fc945b4f877e4f9ccae1e
 val urlNativesLwjgl = "https://github.com/Open-Launcher-Collective/LWJGL3-Android-Builder/releases/download/android-lwjgl-3.4.3/lwjgl-3.4.3.zip"
 val shaNativesLwjgl = "dcc658ded7eee2f332ff77afeafb48194fb22b3910180a5e550df8fa3c83a6dd"
 // Só os natives que o jogo usa (os demais do zip ficam de fora do APK)
-val nativesLwjglUsados = listOf("liblwjgl.so", "liblwjgl_opengles.so")
+val nativesLwjglUsados = listOf("liblwjgl.so", "liblwjgl_opengles.so", "liblwjgl_stb.so")
+// Natives de terceiros compilados por nós (natives/build-android.sh), mesmos commits do LWJGL 3.4.3
+val nativesProprios = listOf("libopenal.so", "libopus.so", "libshaderc.so", "libspirv-cross.so")
+val pastaNativesProprios = rootProject.layout.projectDirectory.dir("../natives/out/arm64-v8a")
+// Arquivos do jogo que vão nos assets (do submódulo upstream, nunca dados do jogo)
+val pastaShadersDoJogo = rootProject.layout.projectDirectory.dir("../upstream/gfx/shaders")
 
 android {
     namespace = "io.github.michelplima.severedchains"
@@ -25,8 +30,8 @@ android {
         applicationId = "io.github.michelplima.severedchains"
         minSdk = 28
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.2.1-m2"
+        versionCode = 5
+        versionName = "0.3.0-m3a"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -109,6 +114,7 @@ abstract class PrepararAssets : DefaultTask() {
     @get:InputFile abstract val jreZip: RegularFileProperty
     @get:Input abstract val jreSha256: Property<String>
     @get:InputFiles abstract val classpath: ConfigurableFileCollection
+    @get:InputDirectory abstract val shaders: DirectoryProperty
     @get:OutputDirectory abstract val saida: DirectoryProperty
 
     @TaskAction
@@ -124,6 +130,11 @@ abstract class PrepararAssets : DefaultTask() {
             jar.name
         }
         File(dir, "java/classpath.txt").writeText(nomes.joinToString("\n"))
+        // Shaders do jogo (GLSL 330 do upstream), listados para o app copiar sem varrer os assets
+        val destinoShaders = File(dir, "jogo/gfx/shaders").apply { mkdirs() }
+        val arquivos = shaders.get().asFile.listFiles()!!.filter { it.isFile }.sortedBy { it.name }
+        arquivos.forEach { it.copyTo(File(destinoShaders, it.name)) }
+        File(dir, "jogo/arquivos.txt").writeText(arquivos.joinToString("\n") { "gfx/shaders/${it.name}" })
     }
 }
 
@@ -132,6 +143,9 @@ abstract class PrepararJniLibs : DefaultTask() {
     @get:InputFile abstract val nativesZip: RegularFileProperty
     @get:Input abstract val usados: ListProperty<String>
     @get:InputFile abstract val libcxx: RegularFileProperty
+    @get:Internal abstract val pastaProprios: DirectoryProperty
+    @get:Input abstract val proprios: ListProperty<String>
+    @get:InputFiles val arquivosProprios: FileCollection get() = pastaProprios.get().asFileTree.matching { include(proprios.get()) }
     @get:OutputDirectory abstract val saida: DirectoryProperty
 
     @TaskAction
@@ -146,6 +160,13 @@ abstract class PrepararJniLibs : DefaultTask() {
             }
         }
         libcxx.get().asFile.copyTo(File(dir, "libc++_shared.so"))
+        for(nome in proprios.get()) {
+            val so = pastaProprios.get().file(nome).asFile
+            if(!so.exists()) {
+                throw GradleException("Falta ${so}. Compile os natives antes: natives/build-android.sh todos")
+            }
+            so.copyTo(File(dir, nome))
+        }
     }
 }
 
@@ -173,11 +194,14 @@ val prepararAssets = tasks.register<PrepararAssets>("prepararAssets") {
     jreSha256 = shaRuntimeJre
     classpath.from(tarefaJarTeste.flatMap { it.archiveFile })
     classpath.from(projetoTeste.configurations.named("runtimeClasspath"))
+    shaders = pastaShadersDoJogo
 }
 
 val prepararJniLibs = tasks.register<PrepararJniLibs>("prepararJniLibs") {
     nativesZip = baixarNativesLwjgl.flatMap { it.destino }
     usados = nativesLwjglUsados
+    pastaProprios = pastaNativesProprios
+    proprios = nativesProprios
     libcxx = androidComponents.sdkComponents.ndkDirectory.map {
         it.file("toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so")
     }

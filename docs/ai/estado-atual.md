@@ -18,10 +18,11 @@ Feito:
 - M2 implementado (0.2.0-m2, dist/sc-android-m2.apk, 54 MB): ponte.c (Surface/EGL GLES 3.2/eventos compartilhados entre ART e HotSpot na mesma libscjvm.so), TelaActivity (SurfaceView, controle, toque, ciclo de vida), scandroid.m2.Tela (LWJGL + GLES: triângulo 320 es, geometry shader, FPS). Natives LWJGL: Open-Launcher-Collective android-lwjgl-3.4.3 (SHA-256 dcc658de…) + libc++_shared do NDK
 - Teste M2 (0.2.0-m2) no Odin: **M2 OK**. Adreno 740, OpenGL ES 3.2 V@0676.53 (driver 12/2023), GLSL ES 3.20, 118 extensões (EXT_geometry_shader e EXT_clip_cull_distance presentes); shaders 320 es e geometry shader OK; ~118,5 FPS em 1920x1080 (vsync 120 Hz) com e sem GS; controle completo pela ponte; saída pelo Voltar limpa (código 0). Aviso "[LWJGL] Incompatible Java and native library versions" = checagem de SHA-1 do jar (feita para o liblwjgl.so oficial de Linux), inofensiva; desligada com -Dorg.lwjgl.util.NoHashChecks=true em 0.2.1-m2
 - Não exercitados no teste: botões A, Start, Select e o ciclo Home → voltar (Surface perdida/recriada)
+- M3 etapa 1 (0.3.0-m3a, dist/sc-android-m3a.apk, 63 MB): natives de terceiros compilados por nós (natives/build-android.sh, mesmos commits do LWJGL 3.4.3, 16 KB): libopenal (OpenSL), libopus (+opusfile+ogg, sem DRED), libspirv-cross, libshaderc; exports conferidos contra os bindings (natives/verificar-exports.sh). liblwjgl_stb do Open-Launcher-Collective. Jar do jogo (lod-game-snapshot.jar, branch android) no APK. Teste scandroid.m3.Bibliotecas: stb, opus, opusfile, OpenAL (bipe) e os 6 programas de shader do jogo via ShaderManager.transpileShader + compilação na GPU. No PC, os 6 programas transpilam para GLSL ES 320. **Ainda não testado no aparelho**
 
 Próximo passo:
-- Opcional: Michel testa 0.2.1-m2 com A, Start, Select e Home → voltar (sem o aviso do LWJGL)
-- M3 (Jogo), em etapas: (1) natives restantes (OpenAL Soft, opus, assimp, shaderc, spirv-cross, stb; mimalloc ou allocator system) e jars do jogo no APK; (2) patch de escolha de plataforma (GameEngine.java:105) + AndroidPlatformManager/AndroidWindow/AndroidInput sobre a ponte; (3) importação dos ISOs via SAF e gameDir no app; (4) tela título em GLES
+- Michel instala dist/sc-android-m3a.apk, roda "M3a: Bibliotecas" (deve ouvir um bipe; tela verde = OK) e traz o log para logs/
+- Depois: M3 etapa 2 (patch de escolha de plataforma em GameEngine.java:105 + AndroidPlatformManager/AndroidWindow/AndroidInput sobre a ponte), etapa 3 (ISOs via SAF, gameDir no app, jars restantes do jogo), etapa 4 (tela título)
 
 Bloqueios:
 - nenhum

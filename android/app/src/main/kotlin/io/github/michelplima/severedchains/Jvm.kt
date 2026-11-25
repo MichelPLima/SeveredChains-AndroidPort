@@ -17,10 +17,23 @@ object Jvm {
         return jars.joinToString(":")
     }
 
+    /** Copia os arquivos do jogo listados em assets/jogo/arquivos.txt (shaders etc.) para filesDir/jogo. */
+    fun prepararArquivosDoJogo(ctx: Context): File {
+        val raiz = File(ctx.filesDir, "jogo")
+        val lista = ctx.assets.open("jogo/arquivos.txt").bufferedReader().use { it.readLines() }.filter { it.isNotBlank() }
+        for(caminho in lista) {
+            val destino = File(raiz, caminho)
+            destino.parentFile?.mkdirs()
+            ctx.assets.open("jogo/$caminho").use { entrada -> destino.outputStream().use { entrada.copyTo(it) } }
+        }
+        return raiz
+    }
+
     fun iniciar(ctx: Context, mainClass: String, extras: List<String> = emptyList()): Int {
         val javaHome = RuntimeInstaller.javaHome(ctx)
         val trabalho = File(ctx.filesDir, "trabalho").apply { mkdirs() }
         val libDir = ctx.applicationInfo.nativeLibraryDir
+        val jogo = prepararArquivosDoJogo(ctx)
 
         val opcoes = buildList {
             add("-Djava.class.path=${prepararClasspath(ctx)}")
@@ -43,6 +56,9 @@ object Jvm {
             // O jar Java traz o SHA-1 do liblwjgl.so oficial de Linux; o nosso é build Android (mesma tag 3.4.3),
             // então o hash nunca bate e o LWJGL imprime "Incompatible Java and native library versions" à toa
             add("-Dorg.lwjgl.util.NoHashChecks=true")
+            // Alocador do sistema (bionic): o jogo não usa mimalloc/jemalloc e eles não vão no APK
+            add("-Dorg.lwjgl.system.allocator=system")
+            add("-Dsc.shaders.dir=${File(jogo, "gfx/shaders").path}")
             addAll(extras)
         }
 

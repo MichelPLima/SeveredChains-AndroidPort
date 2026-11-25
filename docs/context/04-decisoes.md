@@ -67,5 +67,10 @@ Formato: data, decisão, motivo, status. Não apagar entradas antigas: marcar co
 - Motivo: base do `AndroidWindow` do shim (M3) sem SDL e sem um segundo canal de IPC
 - Status: aceita (validar no M2)
 
+## 2026-11-25: Natives de terceiros compilados por nós, nos commits do LWJGL
+- Decisão: OpenAL Soft, opus (+opusfile+ogg), SPIRV-Cross e shaderc são compilados neste repositório (`natives/build-android.sh`, NDK r30 no Windows) a partir dos mesmos commits dos natives oficiais do LWJGL 3.4.3 (lidos dos arquivos `*.so.git` nos jars `natives-linux-arm64`). OpenAL com backend OpenSL. opus sem DRED/OSCE. Páginas de 16 KB
+- Motivo: são bibliotecas C/C++ comuns que o NDK compila em host Windows; evita depender de mais binários comunitários e garante que o binding Java bate com a biblioteca. assimp, mimalloc, JNA, OpenGL desktop e SDL3 não são necessários no Android (ver natives/README.md)
+- Status: aceita
+
 ## Em aberto
 - Shaders: conversão em runtime ou pré-conversão no build

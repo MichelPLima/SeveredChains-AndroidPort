@@ -26,6 +26,11 @@ import android.widget.TextView
  * Sair: botão Voltar do sistema.
  */
 class TelaActivity : Activity(), SurfaceHolder.Callback {
+    companion object {
+        /** Classe principal (com barras) a rodar na HotSpot; padrão: o teste M2. */
+        const val EXTRA_CLASSE = "classe"
+    }
+
     private lateinit var status: TextView
     private val handler = Handler(Looper.getMainLooper())
     private var janelaDefinida = false
@@ -38,7 +43,7 @@ class TelaActivity : Activity(), SurfaceHolder.Callback {
 
     private val atualizarStatus = object : Runnable {
         override fun run() {
-            status.text = Logs.cauda(this@TelaActivity, 4096).trimEnd().lines().takeLast(3).joinToString("\n")
+            status.text = Logs.cauda(this@TelaActivity, 8192).trimEnd().lines().takeLast(14).joinToString("\n")
             handler.postDelayed(this, 500)
         }
     }
@@ -62,8 +67,9 @@ class TelaActivity : Activity(), SurfaceHolder.Callback {
         telaCheia()
 
         if(Native.estado() == Native.PARADO) {
-            Logs.escrever(this, "==== Novo teste M2 ====")
-            val r = Jvm.iniciar(this, "scandroid/m2/Tela")
+            val classe = intent.getStringExtra(EXTRA_CLASSE) ?: "scandroid/m2/Tela"
+            Logs.escrever(this, "==== Novo teste em tela cheia: $classe ====")
+            val r = Jvm.iniciar(this, classe)
             if(r != 0) Logs.escrever(this, "Falha ao iniciar: ${Native.descreverErro(r)}")
         }
     }
