@@ -13,10 +13,11 @@ Feito:
 - Scripts: setup.sh (autocrlf=false, check de Java 25 e de CRLF, exclui upstream/isos/), aplicar-patches.sh, rodar-upstream.sh, prototipo/gles-smoke
 - Análises de causa em docs/processos/casos/: build sem JDK, GLES indisponível no PC, CRLF nos patches de script
 - 2026-11-25, decisões do caminho APK (04-decisoes.md): pular o Termux; shim próprio de janela/entrada (sem SDL3); JRE 25 comunitário fixado (kelvinalumotos jre-25.0.5-2, inspecionado: bionic, aarch64, GNU_HASH, 16 KB); Android Studio + SDK 36 + Build-Tools 36.1.0 + NDK r30 + CMake 3.31.6 (ANDROID_HOME do usuário)
-- M1 implementado em android/ (AGP 9.5.2, Gradle 9.9.2): app Kotlin sem AndroidX, lançador nativo (dlopen libjvm + JNI_CreateJavaVM no processo ":jvm", stdout/stderr no log), runtime-test em Java 25, "Salvar log…" via SAF. APK debug de 51 MB, sem permissões: dist/sc-android-m1.apk. **Ainda não testado no aparelho**
+- M1 implementado em android/ (AGP 9.5.2, Gradle 9.9.2): app Kotlin sem AndroidX, lançador nativo (dlopen libjvm + JNI_CreateJavaVM no processo ":jvm", stdout/stderr no log), runtime-test em Java 25, "Salvar log…" via SAF. APK debug sem permissões: dist/sc-android-m1.apk
+- Teste 1 no Odin (0.1.0-m1): HotSpot criada dentro do processo Android (sem conflito de sinais com o ART), mas falhou ao abrir o jar: "libnet.so not found ... classloader-namespace". Corrigido em 0.1.1-m1 com pré-carregamento das .so do JRE (caso 2026-11-25-libnet-not-found-namespace.md). **0.1.1-m1 ainda não testado**
 
 Próximo passo:
-- Michel instala dist/sc-android-m1.apk no Odin (manual), roda "Iniciar teste M1" e traz o log ("Salvar log…")
+- Michel instala dist/sc-android-m1.apk 0.1.1-m1 no Odin (manual, por cima da anterior), roda "Iniciar teste M1" e traz o log para logs/ na raiz do projeto (fora do git)
 - Se M1 OK: M2 (Tela): natives LWJGL 3.4.3 core + opengles para Android, Surface + EGL a partir da HotSpot, eventos do controle no log
 - Se M1 falhar: Análise de Causa com o log/hs_err (suspeitos: sinais HotSpot x ART, namespace do linker, W^X)
 

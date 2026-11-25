@@ -33,7 +33,7 @@ object Native {
         -2 -> "dlopen do libjvm.so falhou (ver log)"
         -3 -> "JNI_CreateJavaVM não encontrado no libjvm.so"
         -4 -> "JNI_CreateJavaVM falhou (ver log)"
-        -5 -> "classe principal ou main() não encontrada"
+        -5 -> "exceção ou classe principal não encontrada (ver log)"
         -6 -> "não consegui criar a thread da JVM"
         -100 -> "a JVM já foi iniciada neste processo"
         else -> "erro $estado"

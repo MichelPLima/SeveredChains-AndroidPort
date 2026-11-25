@@ -38,3 +38,6 @@ dist/
 .cxx/
 android/.cache/
 android/.kotlin/
+
+# Logs trazidos do aparelho
+logs/

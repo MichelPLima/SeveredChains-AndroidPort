@@ -11,6 +11,7 @@
 #include <jni.h>
 
 #include <android/log.h>
+#include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -82,6 +83,79 @@ static int redirecionarSaida(const char *logPath) {
   return 0;
 }
 
+#define MAX_LIBS 256
+
+static int terminaCom(const char *s, const char *sufixo) {
+  const size_t a = strlen(s);
+  const size_t b = strlen(sufixo);
+  return a >= b && strcmp(s + a - b, sufixo) == 0;
+}
+
+static int listarSo(const char *dir, char **caminhos, int n) {
+  DIR *d = opendir(dir);
+  if(d == NULL) {
+    return n;
+  }
+  struct dirent *e;
+  while((e = readdir(d)) != NULL && n < MAX_LIBS) {
+    /* libjsig intercepta sigaction() do processo inteiro: não carregar junto com o ART */
+    if(!terminaCom(e->d_name, ".so") || strcmp(e->d_name, "libjsig.so") == 0) {
+      continue;
+    }
+    char caminho[PATH_MAX];
+    snprintf(caminho, sizeof(caminho), "%s/%s", dir, e->d_name);
+    caminhos[n++] = strdup(caminho);
+  }
+  closedir(d);
+  return n;
+}
+
+/*
+ * O linker do Android procura dependências (DT_NEEDED) só nas pastas do namespace do app;
+ * ele não olha jre25/lib nem LD_LIBRARY_PATH. Se uma biblioteca com o mesmo soname já está
+ * carregada, porém, o linker reaproveita essa cópia. Então carregamos todas as .so do JRE
+ * pelo caminho completo, em passadas, até não haver progresso (resolve a ordem sozinho).
+ * Ver docs/processos/casos/2026-11-25-libnet-not-found-namespace.md.
+ */
+static void preCarregarBibliotecasDoJre(const char *javaHome) {
+  char *caminhos[MAX_LIBS];
+  char dir[PATH_MAX];
+  int n = 0;
+  snprintf(dir, sizeof(dir), "%s/lib/server", javaHome);
+  n = listarSo(dir, caminhos, n);
+  snprintf(dir, sizeof(dir), "%s/lib", javaHome);
+  n = listarSo(dir, caminhos, n);
+
+  int carregada[MAX_LIBS] = {0};
+  int total = 0;
+  int passada = 0;
+  int progresso = 1;
+  while(progresso) {
+    progresso = 0;
+    passada++;
+    for(int i = 0; i < n; i++) {
+      if(carregada[i]) {
+        continue;
+      }
+      if(dlopen(caminhos[i], RTLD_NOW) != NULL) {
+        carregada[i] = 1;
+        total++;
+        progresso = 1;
+      }
+    }
+  }
+
+  logar("pré-carregadas %d de %d bibliotecas do JRE em %d passada(s)", total, n, passada);
+  for(int i = 0; i < n; i++) {
+    if(!carregada[i]) {
+      /* Repetir o dlopen só para pegar a mensagem de erro da última tentativa */
+      dlopen(caminhos[i], RTLD_NOW);
+      logar("  não carregou: %s", dlerror());
+    }
+    free(caminhos[i]);
+  }
+}
+
 static void *threadDaJvm(void *arg) {
   Lancamento *l = arg;
 
@@ -104,6 +178,8 @@ static void *threadDaJvm(void *arg) {
     atomic_store(&estado, ERRO_DLOPEN);
     return NULL;
   }
+
+  preCarregarBibliotecasDoJre(l->javaHome);
 
   CreateJavaVM_t criar = (CreateJavaVM_t)dlsym(libjvm, "JNI_CreateJavaVM");
   if(criar == NULL) {
@@ -139,8 +215,12 @@ static void *threadDaJvm(void *arg) {
   jclass classe = (*env)->FindClass(env, l->mainClass);
   jmethodID metodoMain = classe ? (*env)->GetStaticMethodID(env, classe, "main", "([Ljava/lang/String;)V") : NULL;
   if(metodoMain == NULL) {
-    (*env)->ExceptionDescribe(env);
-    logar("classe ou main() não encontrada: %s", l->mainClass);
+    if((*env)->ExceptionCheck(env)) {
+      logar("exceção ao carregar %s (detalhes acima):", l->mainClass);
+      (*env)->ExceptionDescribe(env);
+    } else {
+      logar("classe ou main() não encontrada: %s", l->mainClass);
+    }
     atomic_store(&estado, ERRO_CLASSE);
     (*vm)->DestroyJavaVM(vm);
     return NULL;
