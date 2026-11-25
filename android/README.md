@@ -40,11 +40,11 @@ cd android
 .\gradlew.bat assembleDebug
 ```
 
-Saída: `app/build/outputs/apk/debug/app-debug.apk` (cerca de 130 MB). Copiar para `dist/`.
+Saída: `app/build/outputs/apk/debug/app-debug.apk` (cerca de 154 MB). Copiar para `dist/`.
 
 O que o build baixa e verifica (SHA-256) e empacota:
 - `assets/runtime/jre25.zip`: JRE 25 Android (kelvinalumotos jre-25.0.5-2)
-- `lib/arm64-v8a/`: `libscjvm.so` (nosso), `liblwjgl.so`, `liblwjgl_opengles.so` e `liblwjgl_stb.so` (Open-Launcher-Collective android-lwjgl-3.4.3), `libopenal.so`, `libopus.so`, `libshaderc.so`, `libspirv-cross.so` (compilados por nós, `natives/`), `libc++_shared.so` (do NDK r30). Extraídas para `nativeLibraryDir` (`useLegacyPackaging`), porque a HotSpot e o LWJGL carregam por caminho de arquivo
+- `lib/arm64-v8a/`: `libscjvm.so` (nosso), `liblwjgl.so`, `liblwjgl_opengles.so` e `liblwjgl_stb.so` (Open-Launcher-Collective android-lwjgl-3.4.3), `libopenal.so`, `libopus.so`, `libshaderc.so`, `libspirv-cross.so` (compilados por nós, `natives/`), `libc++_shared.so` (do NDK r30), FFmpeg e JavaCPP (`libav*.so`, `libsw*.so`, `libjni*.so`, dos jars `android-arm64` do bytedeco no Maven Central, mesma versão dos jars Java do jogo; só o vídeo de abertura usa). Extraídas para `nativeLibraryDir` (`useLegacyPackaging`), porque a HotSpot e o LWJGL carregam por caminho de arquivo
 - `assets/java/`: `lod-game-snapshot.jar` e as dependências dele (`upstream/build/libs/libs`, sem natives de PC nem JavaFX), jars do LWJGL e `runtime-test.jar`
 - `assets/jogo/`: arquivos de suporte do repositório do jogo (`gfx`, `lang`, `patches`, `log4j2.xml`...). Nunca dados do jogo
 - Jars e arquivos do jogo são copiados para `filesDir` só quando o APK muda (selo `.apk`)

@@ -91,6 +91,10 @@ object Jvm {
             // Alocador do sistema (bionic): o jogo não usa mimalloc/jemalloc e eles não vão no APK
             add("-Dorg.lwjgl.system.allocator=system")
             add("-Dsc.shaders.dir=${File(jogo, "gfx/shaders").path}")
+            // FFmpeg do bytedeco (vídeo de abertura): na HotSpot a JavaCPP detectaria linux-arm64; as .so são as
+            // android-arm64 do APK, que ela carrega com System.loadLibrary pelo java.library.path
+            add("-Dorg.bytedeco.javacpp.platform=android-arm64")
+            add("-Djava.library.path=$libDir")
         }
 
         Logs.escrever(ctx, "Iniciando HotSpot ($mainClass): java.home=${javaHome.path}, diretório=${trabalho.path}")

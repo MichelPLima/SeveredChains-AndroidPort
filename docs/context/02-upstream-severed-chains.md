@@ -45,7 +45,7 @@ Ponto de patch: hoje o GLES é só fallback. No Android, criar direto o contexto
 | lwjgl-assimp | Modelos | Compilar (pesado, mas possível) |
 | lwjgl-shaderc / lwjgl-spvc | Conversão de shaders em runtime | Compilar. Alternativa: pré-converter os shaders no build e pular em runtime |
 | lwjgl-mimalloc | Alocador | Opcional: tentar desligar no Android |
-| javacv + ffmpeg 8.0 (bytedeco) | FMVs (`VideoPlayer.java`) | bytedeco publica `android-arm64` (confirmar para 1.5.13) |
+| javacv 1.5.13 + ffmpeg 8.0.1-1.5.13 (bytedeco) | Só o vídeo de abertura `gfx/intro.mp4` (`VideoPlayer.java`). As FMVs do jogo (STR do disco) são decodificadas em Java (`Fmv`, MDEC) | bytedeco publica `android-arm64` da 8.0.1-1.5.13 (não da 8.0); no APK desde 0.4.1-m3b |
 | JNA 5.16 | Nativo genérico | Tem `android-aarch64` |
 | discord-game-sdk4j | Rich Presence | **Desligar** no Android |
 | org.legendofdragoon:mod-loader 4.3.5 | Mods | Carrega classes dinamicamente: funciona no HotSpot, problemático no ART |

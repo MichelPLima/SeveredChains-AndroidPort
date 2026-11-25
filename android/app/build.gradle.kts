@@ -18,6 +18,17 @@ val nativesLwjglUsados = listOf("liblwjgl.so", "liblwjgl_opengles.so", "liblwjgl
 // Natives de terceiros compilados por nós (natives/build-android.sh), mesmos commits do LWJGL 3.4.3
 val nativesProprios = listOf("libopenal.so", "libopus.so", "libshaderc.so", "libspirv-cross.so")
 val pastaNativesProprios = rootProject.layout.projectDirectory.dir("../natives/out/arm64-v8a")
+// FFmpeg do bytedeco (Maven Central), build android-arm64 da mesma versão dos jars Java que o jogo usa (javacv 1.5.13
+// resolve ffmpeg 8.0.1-1.5.13). O jogo só usa no vídeo de abertura (gfx/intro.mp4). As .so vão para o nativeLibraryDir
+// e a JavaCPP as carrega com System.loadLibrary (java.library.path, ver Jvm.kt)
+val versaoFfmpeg = "8.0.1-1.5.13"
+val versaoJavacpp = "1.5.13"
+val urlFfmpegAndroid = "https://repo1.maven.org/maven2/org/bytedeco/ffmpeg/$versaoFfmpeg/ffmpeg-$versaoFfmpeg-android-arm64.jar"
+val shaFfmpegAndroid = "7ed438d3849fd29bd5fc70ee4a0d44980fa7fbeedb751d63fb53ed3cbd94a7ab"
+val urlJavacppAndroid = "https://repo1.maven.org/maven2/org/bytedeco/javacpp/$versaoJavacpp/javacpp-$versaoJavacpp-android-arm64.jar"
+val shaJavacppAndroid = "f258e04282475d1f6c9dea22aef15b3401de001c2c2509051d9ab1c500e223f5"
+// Os natives JNI da JavaCPP só servem para os jars Java da mesma versão
+val jarsJavaDoBytedeco = listOf("ffmpeg-$versaoFfmpeg.jar", "javacpp-$versaoJavacpp.jar")
 // Distribuição do jogo gerada pelo build do upstream (cd upstream && ./gradlew build): jar, dependências e
 // arquivos de suporte do repositório do Severed Chains (gfx, lang, patches). Nunca dados do jogo (ISOs, files/)
 val pastaDistribuicaoDoJogo = rootProject.layout.projectDirectory.dir("../upstream/build/libs")
@@ -34,8 +45,8 @@ android {
         applicationId = "io.github.michelplima.severedchains"
         minSdk = 28
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.4.0-m3b"
+        versionCode = 7
+        versionName = "0.4.1-m3b"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -150,7 +161,10 @@ abstract class PrepararAssets : DefaultTask() {
     }
 }
 
-/** jniLibs gerados: natives do LWJGL (do zip) + libc++_shared.so do NDK (dependência deles). */
+/**
+ * jniLibs gerados: natives do LWJGL (do zip) + libc++_shared.so do NDK (dependência deles), os nossos
+ * (natives/out) e as .so de lib/arm64-v8a dos jars android-arm64 do bytedeco (FFmpeg + JavaCPP).
+ */
 abstract class PrepararJniLibs : DefaultTask() {
     @get:InputFile abstract val nativesZip: RegularFileProperty
     @get:Input abstract val usados: ListProperty<String>
@@ -158,6 +172,10 @@ abstract class PrepararJniLibs : DefaultTask() {
     @get:Internal abstract val pastaProprios: DirectoryProperty
     @get:Input abstract val proprios: ListProperty<String>
     @get:InputFiles val arquivosProprios: FileCollection get() = pastaProprios.get().asFileTree.matching { include(proprios.get()) }
+    @get:InputFiles abstract val jarsAndroidBytedeco: ConfigurableFileCollection
+    /** libs/ da distribuição do jogo, onde os jars Java correspondentes têm de estar */
+    @get:Internal abstract val libsDoJogo: DirectoryProperty
+    @get:Input abstract val jarsJavaBytedeco: ListProperty<String>
     @get:OutputDirectory abstract val saida: DirectoryProperty
 
     @TaskAction
@@ -179,6 +197,20 @@ abstract class PrepararJniLibs : DefaultTask() {
             }
             so.copyTo(File(dir, nome))
         }
+        for(nome in jarsJavaBytedeco.get()) {
+            if(!libsDoJogo.get().file(nome).asFile.exists()) {
+                throw GradleException("$nome não está em ${libsDoJogo.get()}: o jogo usa outra versão do bytedeco; atualize versaoFfmpeg/versaoJavacpp")
+            }
+        }
+        for(jar in jarsAndroidBytedeco.files) {
+            ZipFile(jar).use { zip ->
+                val libs = zip.entries().asSequence().filter { it.name.startsWith("lib/arm64-v8a/") && it.name.endsWith(".so") }.toList()
+                if(libs.isEmpty()) throw GradleException("Nenhuma .so de arm64-v8a em ${jar.name}")
+                for(entrada in libs) {
+                    zip.getInputStream(entrada).use { e -> File(dir, entrada.name.substringAfterLast('/')).outputStream().use { e.copyTo(it) } }
+                }
+            }
+        }
     }
 }
 
@@ -195,6 +227,18 @@ val baixarNativesLwjgl = tasks.register<BaixarVerificado>("baixarNativesLwjgl") 
     url = urlNativesLwjgl
     sha256 = shaNativesLwjgl
     destino = cache.file("lwjgl/lwjgl-3.4.3-android-arm64.zip")
+}
+
+val baixarFfmpegAndroid = tasks.register<BaixarVerificado>("baixarFfmpegAndroid") {
+    url = urlFfmpegAndroid
+    sha256 = shaFfmpegAndroid
+    destino = cache.file("bytedeco/ffmpeg-$versaoFfmpeg-android-arm64.jar")
+}
+
+val baixarJavacppAndroid = tasks.register<BaixarVerificado>("baixarJavacppAndroid") {
+    url = urlJavacppAndroid
+    sha256 = shaJavacppAndroid
+    destino = cache.file("bytedeco/javacpp-$versaoJavacpp-android-arm64.jar")
 }
 
 evaluationDependsOn(":runtime-test")
@@ -223,6 +267,9 @@ val prepararJniLibs = tasks.register<PrepararJniLibs>("prepararJniLibs") {
     usados = nativesLwjglUsados
     pastaProprios = pastaNativesProprios
     proprios = nativesProprios
+    jarsAndroidBytedeco.from(baixarFfmpegAndroid.flatMap { it.destino }, baixarJavacppAndroid.flatMap { it.destino })
+    libsDoJogo = pastaDistribuicaoDoJogo.dir("libs")
+    jarsJavaBytedeco = jarsJavaDoBytedeco
     libcxx = androidComponents.sdkComponents.ndkDirectory.map {
         it.file("toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so")
     }

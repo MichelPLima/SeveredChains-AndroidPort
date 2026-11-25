@@ -38,7 +38,7 @@ Marcos do APK (cada um gera um APK instalado manualmente no Odin, com log na tel
 
 ## Fase 4: Jogo completo
 - [ ] Áudio (OpenAL Soft/OpenSL): biblioteca validada no M3a (bipe no Odin); falta o áudio do jogo
-- [ ] FMV (javacv/ffmpeg android-arm64)
+- [ ] FMV: as do jogo (STR do disco) são decodificadas em Java (`Fmv`, MDEC); o FFmpeg (javacv) só toca o vídeo de abertura `gfx/intro.mp4`, com os natives bytedeco android-arm64 no APK desde 0.4.1-m3b (falta confirmar no aparelho)
 - [ ] Desligar Discord SDK no Android
 - [ ] Saves e config persistentes; ciclo de vida (pausa/retomar, sair sem corromper save)
 - **Pronto quando:** dá para zerar o Disc 1 com som e FMVs

@@ -56,7 +56,8 @@ B parece o mais controlável, porque o upstream já tem a abstração `PlatformM
 | Shaders | shaderc → spvc em runtime | Igual, ou pré-convertidos no build |
 | Entrada | SDL3 + gamecontrollerdb | Eventos Android → shim / SDL |
 | Áudio | OpenAL Soft | OpenAL Soft (AAudio) |
-| FMV | javacv/ffmpeg | javacv/ffmpeg android-arm64 |
+| Vídeo de abertura (intro.mp4) | javacv/ffmpeg | javacv/ffmpeg android-arm64 (.so no nativeLibraryDir, `System.loadLibrary`) |
+| FMVs do jogo (STR) | Decodificador MDEC em Java | Igual (sem native) |
 | Arquivos | `.` relativo | `user.dir` = pasta do app |
 | Discord | SDK | Desligado |
 
