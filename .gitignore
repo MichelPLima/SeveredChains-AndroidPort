@@ -30,3 +30,6 @@ CRASHLOG-*
 
 # Protótipos
 prototipo/**/out/
+
+# Pacotes para copiar ao aparelho
+dist/
