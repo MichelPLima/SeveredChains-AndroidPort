@@ -39,6 +39,8 @@ O backend Android do SDL3 depende do `SDLActivity` (Java, rodando no ART) para o
 
 B parece o mais controlável, porque o upstream já tem a abstração `PlatformManager` pronta.
 
+**Decidido em 2026-11-25: opção B (shim próprio).** Ver 04-decisoes.md.
+
 ## Caminho alternativo: port para o ART
 
 - Compilar o jar com D8/R8 e desugaring

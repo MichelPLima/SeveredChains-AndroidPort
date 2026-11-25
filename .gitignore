@@ -33,3 +33,8 @@ prototipo/**/out/
 
 # Pacotes para copiar ao aparelho
 dist/
+
+# Android
+.cxx/
+android/.cache/
+android/.kotlin/

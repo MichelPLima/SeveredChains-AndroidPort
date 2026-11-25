@@ -1,5 +1,7 @@
 # Spike 0: Severed Chains em Termux + proot
 
+> **Cancelado em 2026-11-25** (ver docs/context/04-decisoes.md): o projeto foi direto para o APK independente. Guia mantido só como referência.
+
 Objetivo: medir se CPU e JVM no ARM do aparelho seguram o jogo, e fazer a primeira validação real do caminho GLES (`renderer=gles`, patch 0001). É descartável: não é o produto.
 
 Aparelho de referência: AYN Odin 2 Portal (Snapdragon 8 Gen 2, Adreno 740). Sem adb: tudo é copiado e instalado à mão.

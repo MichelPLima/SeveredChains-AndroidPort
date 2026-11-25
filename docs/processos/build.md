@@ -69,4 +69,13 @@ Para conferir fim de linha, use `git ls-files --eol` ou `git cat-file blob <rev>
 
 ## App Android
 
-A ser definido na Fase 2 (`android/README.md`).
+Ver `android/README.md` (estrutura, build e teste no aparelho sem adb).
+
+Ferramentas (instaladas em 2026-11-25): Android Studio (winget `Google.AndroidStudio`) e, no SDK em `%LOCALAPPDATA%\Android\Sdk`, Platform android-36, Build-Tools 36.1.0, NDK 30.0.16248370 e CMake 3.31.6. O `sdkmanager` foi substituído pelo Android CLI:
+
+```powershell
+$sdk = "$env:LOCALAPPDATA\Android\Sdk"
+& "$sdk\cmdline-tools\latest\bin\android.exe" --sdk=$sdk sdk install 'platforms;android-36' 'build-tools;36.1.0' 'ndk;30.0.16248370' 'cmake;3.31.6'
+```
+
+Defina `ANDROID_HOME` do usuário para a pasta do SDK. O Gradle do app roda com o JDK 17; o JDK 25 é achado pelo toolchain para compilar o código que roda na HotSpot.

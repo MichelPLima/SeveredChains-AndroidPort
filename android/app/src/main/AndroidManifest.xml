@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Nenhuma permissão: o app não acessa o armazenamento compartilhado.
+         Logs são salvos pelo seletor do Android (SAF); ISOs entrarão pelo mesmo caminho (M3). -->
+
+    <application
+        android:allowBackup="false"
+        android:label="SC-Android M1"
+        android:largeHeap="true"
+        android:theme="@android:style/Theme.DeviceDefault">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- A HotSpot roda num processo separado: se ela travar ou chamar exit(),
+             o app principal continua aberto e o log pode ser salvo. -->
+        <activity
+            android:name=".JvmActivity"
+            android:exported="false"
+            android:process=":jvm" />
+    </application>
+</manifest>

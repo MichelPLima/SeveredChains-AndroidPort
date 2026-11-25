@@ -9,11 +9,21 @@ Cada fase tem um critério de pronto objetivo. Só avançar com o critério atin
 - [ ] ~~Rodar no PC **forçando GLES** (Mesa ou ANGLE) e jogar até o primeiro combate~~ Movido para o aparelho (Fase 1 e Fase 3), ver 04-decisoes.md em 2026-11-24
 - **Pronto quando:** o jogo roda no PC em GL 3.3 até o primeiro combate, e o patch 0001 compila e aplica limpo
 
-## Fase 1 (Spike 0): Prova em Termux/proot
+## Fase 1 (Spike 0): Prova em Termux/proot ❌ cancelada (2026-11-25, ver 04-decisoes.md)
 - [ ] Rodar o build Linux ARM oficial num Android via Termux + proot (ver `prototipo/termux/`)
 - [ ] Medir FPS em campo e em batalha
 - [ ] Rodar com `-Dsc.renderer=gles` (patch 0001) e ver no log `Renderer mode: GLES` sem `Shaderc compilation failed`: primeira validação real do caminho GLES
 - **Pronto quando:** abre a tela título e anda no mapa. Serve para medir CPU/JVM no ARM, não é o produto
+
+Marcos do APK (cada um gera um APK instalado manualmente no Odin, com log na tela e botão "Compartilhar log"):
+
+| Marco | Conteúdo | Fase |
+|---|---|---|
+| M1 JVM viva | HotSpot 25 dentro do app, teste de versão/arquitetura/benchmark | 2 |
+| M2 Tela | LWJGL + GLES 3.2 desenhando na Surface a partir do HotSpot; botões do Odin no log | 3a |
+| M3 Jogo | Shim de plataforma, importação dos ISOs (SAF), extração, tela título em GLES | 3b |
+| M4 Completo | Áudio, FMV, Discord off, pausa/retomada, saves | 4 |
+| M5 Launcher | UI, mods, opções | 5 |
 
 ## Fase 2 (Spike 1): JVM dentro do APK
 - [ ] OpenJDK 25 aarch64 para Android (reaproveitar receitas do `android-openjdk-build-multiarch`)
@@ -21,7 +31,7 @@ Cada fase tem um critério de pronto objetivo. Só avançar com o critério atin
 - **Pronto quando:** HotSpot rodando dentro do processo do app
 
 ## Fase 3 (Spike 2): Janela, GLES e entrada
-- [ ] Decidir SDL3 vs shim (`PlatformManager`) e registrar em 04-decisoes.md
+- [x] Decidir SDL3 vs shim (`PlatformManager`) e registrar em 04-decisoes.md (shim, 2026-11-25)
 - [ ] Natives LWJGL 3.4.3 android-arm64 (core, opengles, openal, opus, stb, assimp, shaderc, spvc)
 - [ ] Tela título renderizando na Surface Android pelo caminho GlesApi (`-Dsc.renderer=gles`), sem erro de shader
 - **Pronto quando:** tela título com gamepad funcionando dentro do APK
