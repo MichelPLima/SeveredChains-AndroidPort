@@ -1,6 +1,6 @@
 # android/
 
-Projeto Gradle do APK (Kotlin + NDK). Marcos: **M1 (JVM viva)** ✅, **M2 (Tela)** ✅ (a HotSpot 25 desenha na tela do Android com LWJGL + GLES 3.2 e recebe o controle), **M3a (Bibliotecas)** ✅ e **M3b (Jogo sem discos)**: o Severed Chains abre com a plataforma Android do patch 0002.
+Projeto Gradle do APK (Kotlin + NDK). Marcos: **M1 (JVM viva)** ✅, **M2 (Tela)** ✅ (a HotSpot 25 desenha na tela do Android com LWJGL + GLES 3.2 e recebe o controle), **M3a (Bibliotecas)** ✅, **M3b (Jogo sem discos)** ✅ (o Severed Chains abre com a plataforma Android do patch 0002) e **M3c (Discos)**: importação dos 4 `.bin` pelo seletor do Android.
 
 ## Estrutura
 
@@ -12,7 +12,8 @@ android/
                                            tarefas baixarJre (download + SHA-256) e prepararAssets
     src/main/
       AndroidManifest.xml                  sem permissões; JvmActivity no processo ":jvm"
-      kotlin/.../MainActivity.kt           instala o runtime e abre a JVM
+      kotlin/.../MainActivity.kt           importa os discos, instala o runtime e abre a JVM
+      kotlin/.../Discos.kt                 "Importar discos…": seletor do Android, valida o PVD e copia para isos/discoN.bin
       kotlin/.../JvmActivity.kt            processo ":jvm": cria a HotSpot e acompanha
       kotlin/.../RuntimeInstaller.kt       extrai assets/runtime/jre25.zip para filesDir/runtime/jre25
       kotlin/.../Logs.kt, TelaDeLog.kt     log único (filesDir/logs), tela e "Salvar log…" (SAF)
@@ -68,6 +69,8 @@ Cuidado no Kotlin (inclusive `.gradle.kts`): comentários de bloco se aninham. U
 
 **M3a (Bibliotecas):** stb, opus, opusfile, OpenAL (bipe de 1 s) e os 6 programas de shader do jogo na GPU. Tela verde = OK, vermelha = falha.
 
-**M3b (Jogo sem discos):** abre o Severed Chains (`legend.game.Main`, diretório de trabalho `filesDir/jogo`). Sem os discos em `filesDir/jogo/isos`, ele deve parar na tela que pede os 4 discos. A primeira abertura depois de instalar copia cerca de 75 MB de jars e arquivos. **Voltar** fecha.
+**Importar discos…:** seletor do Android; marcar os `.bin` dos 4 discos (NTSC-U), um por vez ou vários de uma vez. O app confere cada arquivo como o jogo confere (setor 16, "PLAYSTATION", ID SCUS94491/94584/94585/94586) e copia os válidos para `filesDir/jogo/isos/disco1.bin` a `disco4.bin` (~700 MB cada). Os originais só são lidos. O log diz por que um arquivo foi recusado (`.cue`, `.iso` de 2048 bytes, `.chd`, `.pbp`, outra região). O jogo exige os 4 discos em toda abertura, então as cópias ficam.
+
+**Jogo:** abre o Severed Chains (`legend.game.Main`, diretório de trabalho `filesDir/jogo`). Sem os discos, para na tela que pede os 4 discos. Com eles, a primeira abertura extrai os arquivos para `filesDir/jogo/files` e vai para a tela título. A primeira abertura depois de instalar o APK copia cerca de 75 MB de jars e arquivos. **Voltar** fecha.
 
 O que o teste M1 confere: propriedades da JVM (`os.arch=aarch64`, `java.version=25.0.5`), recursos do Java 25, arquivos, zip nativo, threads, FFM (`getpid`) e um benchmark de 5 rodadas (as rodadas devem ficar mais rápidas com o JIT C2).

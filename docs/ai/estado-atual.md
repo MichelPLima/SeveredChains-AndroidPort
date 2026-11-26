@@ -1,6 +1,6 @@
 Atualizado: 2026-11-25
 
-Fase: 3 (M3 "Jogo" em andamento: etapas 1 e 2 OK no aparelho; próximo: etapa 3, discos). Fases 0 e 2 (M1) concluídas; Fase 1 (Termux) cancelada
+Fase: 3 (M3 "Jogo" em andamento: etapas 1 e 2 OK no aparelho; etapa 3, discos, implementada e aguardando teste). Fases 0 e 2 (M1) concluídas; Fase 1 (Termux) cancelada
 
 Feito:
 - Estrutura do repositório e docs iniciais; levantamento do upstream no commit edcf232
@@ -27,8 +27,11 @@ Feito:
 - Teste M3b 2 (0.4.1-m3b) no Odin: **M3b OK**. FFmpeg Android carregado; intro.mp4 (h264 High 1280x720 29,97 fps + AAC 48 kHz, 8,6 s) tocou até o fim; o jogo seguiu para a tela sem discos; Voltar fechou limpo (Shutting down → Unpacker "Game closed", esperado → DestroyJavaVM → código 0, sem FORTIFY). Mensagens inofensivas do FFmpeg: "avformat_open_input rejected some options: pixel_format" (o javacv repassa a opção ao demuxer) e "No accelerated colorspace conversion ... yuv420p to rgb24" (swscale em C, sem SIMD para essa conversão)
 - Na saída por crash (System.exit), o bionic imprimiu "FORTIFY: pthread_mutex_lock called on a destroyed mutex" (threads nativas ainda rodando durante o exit). Ver na saída limpa (M4)
 
+- M3 etapa 3 (0.5.0-m3c, dist/sc-android-m3c.apk, 154 MB): botão "Importar discos…" (Discos.kt). Seletor do Android com seleção múltipla, sem permissões; lê o PVD de cada arquivo como o Unpacker (que exige os 4 discos em toda abertura) e copia só os discos válidos para filesDir/jogo/isos/discoN.bin (.parte + rename, checagem de espaço livre, pula disco já importado com o mesmo tamanho). Explica a recusa de .cue, .iso de 2048 bytes, .chd, .pbp e discos de outra região. Decisão em 04-decisoes.md (escolha do Michel: copiar). Botão "M3b: Jogo (sem discos)" virou "Jogo"; status mostra "Discos: 1 ✓ 2 – ..."; fileira de botões rola na horizontal. **Ainda não testado no aparelho**
+
 Próximo passo:
-- Etapa 3 (importar os ISOs via SAF para filesDir/jogo/isos), etapa 4 (tela título)
+- Michel instala dist/sc-android-m3c.apk, importa os 4 .bin, abre "Jogo" (a primeira abertura extrai os arquivos: no PC foram ~53 s) e traz o log. Esperado: Found disk 1..4, extração, scripts aplicados e a tela título (etapa 4)
+- Depois: M4 (áudio do jogo, FMVs do disco, Discord off no patch 0003, pausa/retomada, saves, saída limpa)
 
 Bloqueios:
 - nenhum

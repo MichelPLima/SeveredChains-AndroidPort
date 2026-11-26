@@ -45,8 +45,8 @@ android {
         applicationId = "io.github.michelplima.severedchains"
         minSdk = 28
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.4.1-m3b"
+        versionCode = 8
+        versionName = "0.5.0-m3c"
 
         ndk {
             abiFilters += "arm64-v8a"

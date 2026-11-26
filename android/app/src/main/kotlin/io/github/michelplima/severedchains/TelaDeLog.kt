@@ -8,6 +8,7 @@ import android.os.Looper
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.Button
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -54,7 +55,8 @@ class TelaDeLog(private val activity: Activity, titulo: String, botoes: List<Pai
                 setOnClickListener { acao() }
             })
         }
-        raiz.addView(fileira, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        // Rola na horizontal se os botões não couberem na largura da tela
+        raiz.addView(HorizontalScrollView(activity).apply { addView(fileira) }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         raiz.addView(rolagem, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
         activity.setContentView(raiz)
         fileira.getChildAt(0)?.requestFocus()

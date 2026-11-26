@@ -21,7 +21,7 @@ Marcos do APK (cada um gera um APK instalado manualmente no Odin, com log na tel
 |---|---|---|
 | M1 JVM viva ✅ | HotSpot 25 dentro do app, teste de versão/arquitetura/benchmark | 2 |
 | M2 Tela ✅ | LWJGL + GLES 3.2 desenhando na Surface a partir do HotSpot; botões do Odin no log | 3a |
-| M3 Jogo | M3a bibliotecas ✅; M3b shim de plataforma ✅ (patch 0002; jogo abre sem discos, intro.mp4 com FFmpeg Android); importação dos ISOs (SAF), extração, tela título em GLES | 3b |
+| M3 Jogo | M3a bibliotecas ✅; M3b shim de plataforma ✅ (patch 0002; jogo abre sem discos, intro.mp4 com FFmpeg Android); M3c importação dos discos (SAF, cópia validada), extração, tela título em GLES | 3b |
 | M4 Completo | Áudio, FMV, Discord off, pausa/retomada, saves | 4 |
 | M5 Launcher | UI, mods, opções | 5 |
 
@@ -44,7 +44,7 @@ Marcos do APK (cada um gera um APK instalado manualmente no Odin, com log na tel
 - **Pronto quando:** dá para zerar o Disc 1 com som e FMVs
 
 ## Fase 5: Launcher e UX
-- [ ] Importar ISOs via SAF, validar os 4 discos, primeira extração com barra de progresso
+- [~] Importar ISOs via SAF, validar os 4 discos, primeira extração com barra de progresso: importação com validação feita no M3c (0.5.0-m3c, botão simples); falta a UI do launcher e um patch para dispensar os discos depois da extração (ver 04-decisoes.md)
 - [ ] Overlay de toque e modo retrato/paisagem
 - [ ] Widescreen em telas mais largas que 16:9: testar submaps em `EXPANDED` e decidir o padrão para celular (ver 02-upstream, seção Widescreen)
 - [ ] Gerenciador de mods (pasta `mods/`)

@@ -72,5 +72,11 @@ Formato: data, decisão, motivo, status. Não apagar entradas antigas: marcar co
 - Motivo: são bibliotecas C/C++ comuns que o NDK compila em host Windows; evita depender de mais binários comunitários e garante que o binding Java bate com a biblioteca. assimp, mimalloc, JNA, OpenGL desktop e SDL3 não são necessários no Android (ver natives/README.md)
 - Status: aceita
 
+## 2026-11-25: Discos copiados pelo seletor do Android
+- Decisão: os 4 `.bin` entram pelo seletor do Android (SAF, `ACTION_OPEN_DOCUMENT` com seleção múltipla, sem permissão de armazenamento). O app lê o PVD de cada arquivo como o `Unpacker` (setor 16 cru, "PLAYSTATION", ID SCUS94491/94584/94585/94586) e copia só os discos válidos para `filesDir/jogo/isos/discoN.bin` (via `.parte` + rename). Os originais só são lidos
+- Motivo: o `Unpacker` exige os 4 discos em toda abertura (não só na extração), então o jogo precisa de acesso permanente a eles. Alternativas descartadas: "acesso a todos os arquivos" (permissão ampla de leitura e escrita no armazenamento do aparelho, que é a coleção de ROMs do Michel) e leitura pelo descritor do SAF sem cópia (a HotSpot reabriria `/proc/self/fd/N`, que o FUSE do Android pode negar). Custo: ~2,7 GB extras enquanto as cópias existirem. Escolha do Michel
+- Futuro: patch para dispensar os discos depois de uma extração completa (`files/version` igual ao `Unpacker.VERSION`), e então apagar as cópias
+- Status: aceita
+
 ## Em aberto
 - Shaders: conversão em runtime ou pré-conversão no build
