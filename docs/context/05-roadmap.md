@@ -21,7 +21,7 @@ Marcos do APK (cada um gera um APK instalado manualmente no Odin, com log na tel
 |---|---|---|
 | M1 JVM viva ✅ | HotSpot 25 dentro do app, teste de versão/arquitetura/benchmark | 2 |
 | M2 Tela ✅ | LWJGL + GLES 3.2 desenhando na Surface a partir do HotSpot; botões do Odin no log | 3a |
-| M3 Jogo | M3a bibliotecas ✅; M3b shim de plataforma (patch 0002, jogo abre sem discos); importação dos ISOs (SAF), extração, tela título em GLES | 3b |
+| M3 Jogo | M3a bibliotecas ✅; M3b shim de plataforma ✅ (patch 0002; jogo abre sem discos, intro.mp4 com FFmpeg Android); importação dos ISOs (SAF), extração, tela título em GLES | 3b |
 | M4 Completo | Áudio, FMV, Discord off, pausa/retomada, saves | 4 |
 | M5 Launcher | UI, mods, opções | 5 |
 
@@ -38,7 +38,7 @@ Marcos do APK (cada um gera um APK instalado manualmente no Odin, com log na tel
 
 ## Fase 4: Jogo completo
 - [ ] Áudio (OpenAL Soft/OpenSL): biblioteca validada no M3a (bipe no Odin); falta o áudio do jogo
-- [ ] FMV: as do jogo (STR do disco) são decodificadas em Java (`Fmv`, MDEC); o FFmpeg (javacv) só toca o vídeo de abertura `gfx/intro.mp4`, com os natives bytedeco android-arm64 no APK desde 0.4.1-m3b (falta confirmar no aparelho)
+- [~] FMV: as do jogo (STR do disco) são decodificadas em Java (`Fmv`, MDEC); o FFmpeg (javacv) só toca o vídeo de abertura `gfx/intro.mp4`, com os natives bytedeco android-arm64 no APK (OK no Odin em 0.4.1-m3b). Falta testar as FMVs do disco
 - [ ] Desligar Discord SDK no Android
 - [ ] Saves e config persistentes; ciclo de vida (pausa/retomar, sair sem corromper save)
 - **Pronto quando:** dá para zerar o Disc 1 com som e FMVs

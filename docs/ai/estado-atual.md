@@ -1,6 +1,6 @@
 Atualizado: 2026-11-25
 
-Fase: 3 (M3 "Jogo" em andamento: etapa 1 OK no aparelho; etapa 2: o jogo sobe no aparelho, correção do vídeo de abertura aguardando teste). Fases 0 e 2 (M1) concluídas; Fase 1 (Termux) cancelada
+Fase: 3 (M3 "Jogo" em andamento: etapas 1 e 2 OK no aparelho; próximo: etapa 3, discos). Fases 0 e 2 (M1) concluídas; Fase 1 (Termux) cancelada
 
 Feito:
 - Estrutura do repositório e docs iniciais; levantamento do upstream no commit edcf232
@@ -23,12 +23,12 @@ Feito:
 - Detalhe cosmético pendente: opus_get_version_string devolve "libopus unknown" (clone raso sem tag; gravar package_version no build do opus)
 - M3 etapa 2 (0.4.0-m3b, dist/sc-android-m3b.apk, 130 MB): patch patches/0002-plataforma-android.patch (aplica limpo sobre edcf232 + 0001): com -Dsc.platform=android o GameEngine usa AndroidPlatformManager (controle com a lógica de bindings/deadzones do SDL, HAT -> direcional, gatilhos analógicos com BRAKE/GAS e L2/R2 de reserva, toque como mouse), AndroidWindow (Surface + EGL GLES 3.2 + GlesApi; pausa sem perder o contexto quando a Surface some) e AndroidBridge (natives da ponte; ponte.c renomeado para Java_legend_core_platform_AndroidBridge_*, + isContextCurrent). Testes M2/M3a passaram a usar AndroidBridge (scandroid.ponte.Ponte removido). APK leva o jogo inteiro: lod-game-snapshot.jar + 77 jars (upstream/build/libs/libs sem natives de PC e sem JavaFX) e 432 arquivos de suporte (gfx, lang, patches, log4j2.xml), copiados para filesDir só quando o APK muda. Botão "M3b: Jogo (sem discos)" roda legend.game.Main com diretório filesDir/jogo e as opções do launch do upstream (joml, --add-opens/--add-exports), -Xmx2048m, --sun-misc-unsafe-memory-access=allow. Logs sem as cores ANSI do log4j. Esperado: o jogo para na tela do Unpacker que pede os 4 discos
 - Teste M3b 1 (0.4.0-m3b) no Odin: o jogo subiu inteiro na HotSpot dentro do APK. AndroidPlatformManager, mods (lod, turn_order, lod_core), config, OpenAL com OpenSL, AndroidWindow 1920x1080 com GlesApi (OpenGL ES 3.2 V@0676.53), os 6 shaders compilados, Updater pulado (build custom), Discord falhou sem derrubar nada (esperado, vai para o patch 0003). Caiu 1,4 s depois no vídeo de abertura (gfx/intro.mp4): "no jniavutil in java.library.path", natives do FFmpeg ausentes. Caso docs/processos/casos/2026-11-25-ffmpeg-intro-sem-natives.md
-- Correção em 0.4.1-m3b (dist/sc-android-m3b.apk, 154 MB): o build baixa ffmpeg-8.0.1-1.5.13-android-arm64.jar e javacpp-1.5.13-android-arm64.jar do Maven Central (SHA-256 fixado) e põe as .so nos jniLibs; Jvm.kt passa -Dorg.bytedeco.javacpp.platform=android-arm64 e -Djava.library.path=nativeLibraryDir. **Ainda não testado no aparelho**
+- Correção em 0.4.1-m3b (dist/sc-android-m3b.apk, 154 MB): o build baixa ffmpeg-8.0.1-1.5.13-android-arm64.jar e javacpp-1.5.13-android-arm64.jar do Maven Central (SHA-256 fixado) e põe as .so nos jniLibs; Jvm.kt passa -Dorg.bytedeco.javacpp.platform=android-arm64 e -Djava.library.path=nativeLibraryDir
+- Teste M3b 2 (0.4.1-m3b) no Odin: **M3b OK**. FFmpeg Android carregado; intro.mp4 (h264 High 1280x720 29,97 fps + AAC 48 kHz, 8,6 s) tocou até o fim; o jogo seguiu para a tela sem discos; Voltar fechou limpo (Shutting down → Unpacker "Game closed", esperado → DestroyJavaVM → código 0, sem FORTIFY). Mensagens inofensivas do FFmpeg: "avformat_open_input rejected some options: pixel_format" (o javacv repassa a opção ao demuxer) e "No accelerated colorspace conversion ... yuv420p to rgb24" (swscale em C, sem SIMD para essa conversão)
 - Na saída por crash (System.exit), o bionic imprimiu "FORTIFY: pthread_mutex_lock called on a destroyed mutex" (threads nativas ainda rodando durante o exit). Ver na saída limpa (M4)
 
 Próximo passo:
-- Michel instala dist/sc-android-m3b.apk (0.4.1-m3b), toca em "M3b: Jogo (sem discos)" e traz o log para logs/. Esperado: o vídeo de abertura toca (com som) e o jogo para na tela que pede os 4 discos
-- Depois: etapa 3 (importar os ISOs via SAF para filesDir/jogo/isos), etapa 4 (tela título)
+- Etapa 3 (importar os ISOs via SAF para filesDir/jogo/isos), etapa 4 (tela título)
 
 Bloqueios:
 - nenhum
