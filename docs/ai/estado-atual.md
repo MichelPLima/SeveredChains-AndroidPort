@@ -27,10 +27,17 @@ Feito:
 - Teste M3b 2 (0.4.1-m3b) no Odin: **M3b OK**. FFmpeg Android carregado; intro.mp4 (h264 High 1280x720 29,97 fps + AAC 48 kHz, 8,6 s) tocou até o fim; o jogo seguiu para a tela sem discos; Voltar fechou limpo (Shutting down → Unpacker "Game closed", esperado → DestroyJavaVM → código 0, sem FORTIFY). Mensagens inofensivas do FFmpeg: "avformat_open_input rejected some options: pixel_format" (o javacv repassa a opção ao demuxer) e "No accelerated colorspace conversion ... yuv420p to rgb24" (swscale em C, sem SIMD para essa conversão)
 - Na saída por crash (System.exit), o bionic imprimiu "FORTIFY: pthread_mutex_lock called on a destroyed mutex" (threads nativas ainda rodando durante o exit). Ver na saída limpa (M4)
 
-- M3 etapa 3 (0.5.0-m3c, dist/sc-android-m3c.apk, 154 MB): botão "Importar discos…" (Discos.kt). Seletor do Android com seleção múltipla, sem permissões; lê o PVD de cada arquivo como o Unpacker (que exige os 4 discos em toda abertura) e copia só os discos válidos para filesDir/jogo/isos/discoN.bin (.parte + rename, checagem de espaço livre, pula disco já importado com o mesmo tamanho). Explica a recusa de .cue, .iso de 2048 bytes, .chd, .pbp e discos de outra região. Decisão em 04-decisoes.md (escolha do Michel: copiar). Botão "M3b: Jogo (sem discos)" virou "Jogo"; status mostra "Discos: 1 ✓ 2 – ..."; fileira de botões rola na horizontal. **Ainda não testado no aparelho**
+- M3 etapa 3 (0.5.0-m3c, dist/sc-android-m3c.apk, 154 MB): botão "Importar discos…" (Discos.kt). Seletor do Android com seleção múltipla, sem permissões; lê o PVD de cada arquivo como o Unpacker (que exige os 4 discos em toda abertura) e copia só os discos válidos para filesDir/jogo/isos/discoN.bin (.parte + rename, checagem de espaço livre, pula disco já importado com o mesmo tamanho). Explica a recusa de .cue, .iso de 2048 bytes, .chd, .pbp e discos de outra região. Decisão em 04-decisoes.md (escolha do Michel: copiar). **Ainda não testado no aparelho**
+- Launcher com a identidade visual do jogo (0.5.1-m3c, pedido do Michel: "matar tudo agora"):
+  - Imagens: só o que o repositório do Severed Chains já traz (gfx/ui/logo.png; o orbe gfx/textures/icon.png, que também vira o ícone adaptativo do app via recurso gerado no build). Nome do app: "Severed Chains"
+  - MainActivity em paisagem e tela cheia: logo recortado à esquerda sobre fundo azul-noite radial; à direita, janela no estilo dos menus do jogo (degradê azul, borda clara dupla) com os 4 discos (orbe aceso ou apagado, nome, código SCUS, "Pronto · N MB" ou barra de progresso dourada), mensagens (dicas, recusas, aviso de crash da última sessão) e os botões "Importar discos" e "Jogar" (só com os 4 discos). Rodapé: versão, "Salvar log", "Diagnóstico". Foco dourado para o direcional
+  - Paleta e componentes em Visual.kt; disparo da JVM em Abrir.kt; testes M1/M2/M3a, log e "Jogo (sem checar discos)" em DiagnosticoActivity (TelaDeLog com o mesmo visual)
+  - Jogo em tela cheia sem o log por cima (fica só nos testes ou se a JVM não subir); cabeçalho do log ganhou resolução e densidade da tela
+  - Discos.importar avisa a tela por eventos (Discos.Andamento)
+  - Não visto no aparelho: o PC não roda a interface Android. Pedir print ao Michel
 
 Próximo passo:
-- Michel instala dist/sc-android-m3c.apk, importa os 4 .bin, abre "Jogo" (a primeira abertura extrai os arquivos: no PC foram ~53 s) e traz o log. Esperado: Found disk 1..4, extração, scripts aplicados e a tela título (etapa 4)
+- Michel instala dist/sc-android-m3c.apk (0.5.1-m3c), confere o launcher (print em logs/ ajuda a ajustar o visual), importa os 4 .bin, toca em "Jogar" (a primeira abertura extrai os arquivos: no PC foram ~53 s) e traz o log. Esperado: Found disk 1..4, extração, scripts aplicados e a tela título (etapa 4)
 - Depois: M4 (áudio do jogo, FMVs do disco, Discord off no patch 0003, pausa/retomada, saves, saída limpa)
 
 Bloqueios:

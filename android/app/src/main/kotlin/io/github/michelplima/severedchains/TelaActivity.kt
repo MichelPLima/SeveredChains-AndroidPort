@@ -34,6 +34,8 @@ class TelaActivity : Activity(), SurfaceHolder.Callback {
     private lateinit var status: TextView
     private val handler = Handler(Looper.getMainLooper())
     private var janelaDefinida = false
+    /** Log por cima da imagem: só nos testes (ou se a JVM não subir); o jogo ocupa a tela toda */
+    private var mostrarLog = true
 
     private val eixos = intArrayOf(
         MotionEvent.AXIS_X, MotionEvent.AXIS_Y, MotionEvent.AXIS_Z, MotionEvent.AXIS_RZ,
@@ -66,12 +68,17 @@ class TelaActivity : Activity(), SurfaceHolder.Callback {
         })
         telaCheia()
 
+        val classe = intent.getStringExtra(EXTRA_CLASSE) ?: "scandroid/m2/Tela"
+        mostrarLog = classe != Jvm.CLASSE_DO_JOGO
         if(Native.estado() == Native.PARADO) {
-            val classe = intent.getStringExtra(EXTRA_CLASSE) ?: "scandroid/m2/Tela"
             Logs.escrever(this, "==== Tela cheia: $classe ====")
             val r = if(classe == Jvm.CLASSE_DO_JOGO) Jvm.iniciarJogo(this) else Jvm.iniciar(this, classe)
-            if(r != 0) Logs.escrever(this, "Falha ao iniciar: ${Native.descreverErro(r)}")
+            if(r != 0) {
+                Logs.escrever(this, "Falha ao iniciar: ${Native.descreverErro(r)}")
+                mostrarLog = true
+            }
         }
+        status.visibility = if(mostrarLog) View.VISIBLE else View.GONE
     }
 
     private fun telaCheia() {
@@ -88,7 +95,7 @@ class TelaActivity : Activity(), SurfaceHolder.Callback {
 
     override fun onResume() {
         super.onResume()
-        handler.post(atualizarStatus)
+        if(mostrarLog) handler.post(atualizarStatus)
     }
 
     override fun onPause() {

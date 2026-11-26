@@ -44,7 +44,7 @@ Marcos do APK (cada um gera um APK instalado manualmente no Odin, com log na tel
 - **Pronto quando:** dá para zerar o Disc 1 com som e FMVs
 
 ## Fase 5: Launcher e UX
-- [~] Importar ISOs via SAF, validar os 4 discos, primeira extração com barra de progresso: importação com validação feita no M3c (0.5.0-m3c, botão simples); falta a UI do launcher e um patch para dispensar os discos depois da extração (ver 04-decisoes.md)
+- [~] Importar ISOs via SAF, validar os 4 discos, primeira extração com barra de progresso: importação com validação e launcher com a identidade visual do jogo feitos no M3c (0.5.1-m3c: janela dos discos com progresso, Jogar, Diagnóstico); falta um patch para dispensar os discos depois da extração (ver 04-decisoes.md)
 - [ ] Overlay de toque e modo retrato/paisagem
 - [ ] Widescreen em telas mais largas que 16:9: testar submaps em `EXPANDED` e decidir o padrão para celular (ver 02-upstream, seção Widescreen)
 - [ ] Gerenciador de mods (pasta `mods/`)

@@ -2,22 +2,34 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Nenhuma permissão: o app não acessa o armazenamento compartilhado.
-         Logs são salvos pelo seletor do Android (SAF); ISOs entrarão pelo mesmo caminho (M3). -->
+         Discos e logs passam pelo seletor do Android (SAF). -->
 
     <application
         android:allowBackup="false"
-        android:label="SC-Android"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="Severed Chains"
         android:largeHeap="true"
-        android:theme="@android:style/Theme.DeviceDefault">
+        android:theme="@style/Tema.SC">
 
+        <!-- Launcher: discos e "Jogar". Paisagem, como o jogo; controle conectado/desconectado não recria a tela -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:configChanges="keyboard|keyboardHidden|navigation"
+            android:exported="true"
+            android:screenOrientation="sensorLandscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Testes M1/M2/M3a, log e "jogo sem checar discos" -->
+        <activity
+            android:name=".DiagnosticoActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape" />
 
         <!-- A HotSpot roda num processo separado: se ela travar ou chamar exit(),
              o app principal continua aberto e o log pode ser salvo. -->
@@ -26,8 +38,8 @@
             android:exported="false"
             android:process=":jvm" />
 
-        <!-- M2: tela cheia em paisagem; mudanças de configuração não recriam a Activity
-             (a Surface e a JVM continuam). -->
+        <!-- Jogo e testes de tela: tela cheia em paisagem; mudanças de configuração não recriam
+             a Activity (a Surface e a JVM continuam). -->
         <activity
             android:name=".TelaActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"

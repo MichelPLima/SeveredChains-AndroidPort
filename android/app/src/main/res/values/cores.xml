@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mesmas cores de Visual.kt (identidade do launcher) -->
+<resources>
+    <color name="fundo">#FF070B1C</color>
+    <color name="fundo_icone">#FF0B1330</color>
+    <color name="ouro">#FFE6C46A</color>
+</resources>

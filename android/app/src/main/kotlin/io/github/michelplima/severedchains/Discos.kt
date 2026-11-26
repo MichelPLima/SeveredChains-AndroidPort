@@ -21,7 +21,15 @@ object Discos {
     const val PEDIDO = 4202
 
     /** Unpacker.DISK_IDS: discos 1 a 4 da versão americana (NTSC-U), a única que o jogo aceita */
-    private val IDS = listOf("SCUS94491", "SCUS94584", "SCUS94585", "SCUS94586")
+    val IDS = listOf("SCUS94491", "SCUS94584", "SCUS94585", "SCUS94586")
+
+    /** Avisos da importação para a tela (chamados na thread da importação). */
+    interface Andamento {
+        fun conferindo(nome: String) {}
+        fun copiando(indice: Int, copiados: Long, total: Long) {}
+        fun importado(indice: Int, novo: Boolean) {}
+        fun recusado(nome: String, motivo: String) {}
+    }
     /** IsoReader.SECTOR_SIZE */
     private const val SETOR = 2352
     /** Unpacker.PVD_SECTOR */
@@ -38,6 +46,15 @@ object Discos {
     fun arquivo(ctx: Context, indice: Int): File = File(pasta(ctx), "disco${indice + 1}.bin")
 
     fun todos(ctx: Context): Boolean = IDS.indices.all { arquivo(ctx, it).isFile }
+
+    /** Tamanho da cópia do disco, ou -1 se ele não foi importado. */
+    fun tamanho(ctx: Context, indice: Int): Long = arquivo(ctx, indice).let { if(it.isFile) it.length() else -1 }
+
+    /** O jogo já extraiu os arquivos dos discos (Unpacker grava files/version no fim). */
+    fun extraidos(ctx: Context): Boolean = File(Jvm.pastaDoJogo(ctx), "files/version").isFile
+
+    /** "SCUS94491" -> "SCUS-94491", como na lombada */
+    fun codigo(indice: Int): String = IDS[indice].let { it.substring(0, 4) + "-" + it.substring(4) }
 
     /** Ex.: "Discos: 1 ✓  2 ✓  3 –  4 –" */
     fun resumo(ctx: Context): String = "Discos: " + IDS.indices.joinToString("  ") { "${it + 1} " + if(arquivo(ctx, it).isFile) "✓" else "–" }
@@ -60,39 +77,45 @@ object Discos {
         return listOfNotNull(data.data)
     }
 
-    /** Confere e copia cada arquivo. Roda fora da thread principal; [progresso] recebe mensagens curtas para a tela. */
-    fun importar(ctx: Context, uris: List<Uri>, progresso: (String) -> Unit) {
+    /** Confere e copia cada arquivo, avisando [andamento]. Roda fora da thread principal. */
+    fun importar(ctx: Context, uris: List<Uri>, andamento: Andamento) {
         pasta(ctx).mkdirs()
         Logs.escrever(ctx, "==== Importar discos: ${uris.size} arquivo(s) ====")
         for(uri in uris) {
             val (nome, tamanho) = info(ctx, uri)
             try {
-                ctx.contentResolver.openInputStream(uri)?.use { importarUm(ctx, it, nome, tamanho, progresso) }
-                    ?: Logs.escrever(ctx, "$nome: o seletor não abriu o arquivo")
+                ctx.contentResolver.openInputStream(uri)?.use { importarUm(ctx, it, nome, tamanho, andamento) }
+                    ?: recusar(ctx, andamento, nome, "o seletor não abriu o arquivo")
             } catch(e: Exception) {
-                Logs.escrever(ctx, "$nome: falha ao importar: $e")
+                recusar(ctx, andamento, nome, "falha ao ler ou gravar (${e.message ?: e})")
             }
         }
         Logs.escrever(ctx, resumo(ctx))
     }
 
-    private fun importarUm(ctx: Context, entrada: InputStream, nome: String, tamanho: Long, progresso: (String) -> Unit) {
-        progresso("Conferindo $nome…")
+    private fun recusar(ctx: Context, andamento: Andamento, nome: String, motivo: String) {
+        Logs.escrever(ctx, "$nome: ignorado, $motivo")
+        andamento.recusado(nome, motivo)
+    }
+
+    private fun importarUm(ctx: Context, entrada: InputStream, nome: String, tamanho: Long, andamento: Andamento) {
+        andamento.conferindo(nome)
         val cabecalho = ByteArray(CABECALHO)
         val lidos = lerAte(entrada, cabecalho)
         val indice = identificar(cabecalho, lidos)
         if(indice !is Int) {
-            Logs.escrever(ctx, "$nome: ignorado, $indice")
+            recusar(ctx, andamento, nome, indice.toString())
             return
         }
         val destino = arquivo(ctx, indice)
         if(tamanho > 0 && destino.isFile && destino.length() == tamanho) {
             Logs.escrever(ctx, "$nome: disco ${indice + 1} já importado (mesmo tamanho), mantido")
+            andamento.importado(indice, novo = false)
             return
         }
         val livre = pasta(ctx).usableSpace + (if(destino.isFile) destino.length() else 0)
         if(tamanho > 0 && livre < tamanho + MARGEM_LIVRE) {
-            Logs.escrever(ctx, "$nome: sem espaço para o disco ${indice + 1} (precisa de ${mb(tamanho + MARGEM_LIVRE)} MB, livres ${mb(livre)} MB)")
+            recusar(ctx, andamento, nome, "sem espaço para o disco ${indice + 1} (precisa de ${mb(tamanho + MARGEM_LIVRE)} MB, livres ${mb(livre)} MB)")
             return
         }
 
@@ -100,35 +123,42 @@ object Discos {
         val parte = File(destino.path + ".parte")
         val inicio = System.nanoTime()
         var copiados = lidos.toLong()
-        parte.outputStream().use { saida ->
-            saida.write(cabecalho, 0, lidos)
-            val buf = ByteArray(1 shl 20)
-            var ultimoAviso = 0L
-            while(true) {
-                val n = entrada.read(buf)
-                if(n < 0) break
-                saida.write(buf, 0, n)
-                copiados += n
-                val agora = System.nanoTime()
-                if(agora - ultimoAviso > 300_000_000L) {
-                    ultimoAviso = agora
-                    progresso("Copiando disco ${indice + 1}: ${mb(copiados)}" + (if(tamanho > 0) " de ${mb(tamanho)}" else "") + " MB")
+        andamento.copiando(indice, copiados, tamanho)
+        try {
+            parte.outputStream().use { saida ->
+                saida.write(cabecalho, 0, lidos)
+                val buf = ByteArray(1 shl 20)
+                var ultimoAviso = 0L
+                while(true) {
+                    val n = entrada.read(buf)
+                    if(n < 0) break
+                    saida.write(buf, 0, n)
+                    copiados += n
+                    val agora = System.nanoTime()
+                    if(agora - ultimoAviso > 200_000_000L) {
+                        ultimoAviso = agora
+                        andamento.copiando(indice, copiados, tamanho)
+                    }
                 }
             }
+        } catch(e: Exception) {
+            parte.delete()
+            throw e
         }
         if(tamanho > 0 && copiados != tamanho) {
             parte.delete()
-            Logs.escrever(ctx, "$nome: cópia incompleta (${copiados} de ${tamanho} bytes), descartada")
+            recusar(ctx, andamento, nome, "cópia incompleta ($copiados de $tamanho bytes), descartada")
             return
         }
         if(destino.exists()) destino.delete()
         if(!parte.renameTo(destino)) {
             parte.delete()
-            Logs.escrever(ctx, "$nome: não consegui gravar ${destino.name}")
+            recusar(ctx, andamento, nome, "não consegui gravar ${destino.name}")
             return
         }
         val segundos = (System.nanoTime() - inicio) / 1e9
         Logs.escrever(ctx, "$nome: disco ${indice + 1} (${IDS[indice]}) importado, ${mb(copiados)} MB em ${"%.1f".format(segundos)} s")
+        andamento.importado(indice, novo = true)
     }
 
     /** Índice do disco (0 a 3) ou o motivo da recusa, para o log. */

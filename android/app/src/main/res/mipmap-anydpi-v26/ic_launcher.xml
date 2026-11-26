@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ícone adaptativo: orbe do Severed Chains (drawable/orbe, gerado de gfx/textures/icon.png) sobre azul-noite.
+     O recuo deixa o orbe dentro da zona segura (66 de 108 dp) de qualquer máscara do launcher. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/fundo_icone" />
+    <foreground>
+        <inset
+            android:drawable="@drawable/orbe"
+            android:inset="20%" />
+    </foreground>
+</adaptive-icon>

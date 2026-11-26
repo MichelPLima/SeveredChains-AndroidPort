@@ -45,8 +45,8 @@ android {
         applicationId = "io.github.michelplima.severedchains"
         minSdk = 28
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.5.0-m3c"
+        versionCode = 9
+        versionName = "0.5.1-m3c"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -214,6 +214,20 @@ abstract class PrepararJniLibs : DefaultTask() {
     }
 }
 
+/** Recursos gerados: o orbe do Severed Chains (gfx/textures/icon.png do repositório do jogo), para o ícone e o launcher. */
+abstract class PrepararRecursos : DefaultTask() {
+    @get:InputFile abstract val orbe: RegularFileProperty
+    @get:OutputDirectory abstract val saida: DirectoryProperty
+
+    @TaskAction
+    fun preparar() {
+        val dir = File(saida.get().asFile, "drawable-nodpi")
+        saida.get().asFile.deleteRecursively()
+        dir.mkdirs()
+        orbe.get().asFile.copyTo(File(dir, "orbe.png"))
+    }
+}
+
 val cache = rootProject.layout.projectDirectory.dir(".cache")
 
 val baixarJre = tasks.register<BaixarVerificado>("baixarJre") {
@@ -275,9 +289,14 @@ val prepararJniLibs = tasks.register<PrepararJniLibs>("prepararJniLibs") {
     }
 }
 
+val prepararRecursos = tasks.register<PrepararRecursos>("prepararRecursos") {
+    orbe = pastaDistribuicaoDoJogo.file("gfx/textures/icon.png")
+}
+
 androidComponents {
     onVariants { variant ->
         variant.sources.assets?.addGeneratedSourceDirectory(prepararAssets, PrepararAssets::saida)
+        variant.sources.res?.addGeneratedSourceDirectory(prepararRecursos, PrepararRecursos::saida)
         variant.sources.jniLibs?.addGeneratedSourceDirectory(prepararJniLibs, PrepararJniLibs::saida)
     }
 }

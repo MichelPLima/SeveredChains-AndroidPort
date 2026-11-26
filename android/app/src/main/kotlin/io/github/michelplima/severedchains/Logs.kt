@@ -36,10 +36,12 @@ object Logs {
     fun cabecalhoAparelho(ctx: Context): String {
         val pi = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
         val soc = if(Build.VERSION.SDK_INT >= 31) "${Build.SOC_MANUFACTURER} ${Build.SOC_MODEL}" else Build.HARDWARE
+        val dm = ctx.resources.displayMetrics
         return buildString {
             append("App: ${pi.versionName}\n")
             append("Aparelho: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})\n")
             append("SoC: $soc\n")
+            append("Tela: ${dm.widthPixels}x${dm.heightPixels} px, ${dm.densityDpi} dpi (densidade ${dm.density})\n")
             append("Android: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n")
             append("ABIs: ${Build.SUPPORTED_ABIS.joinToString()}")
         }

@@ -12,8 +12,13 @@ android/
                                            tarefas baixarJre (download + SHA-256) e prepararAssets
     src/main/
       AndroidManifest.xml                  sem permissões; JvmActivity no processo ":jvm"
-      kotlin/.../MainActivity.kt           importa os discos, instala o runtime e abre a JVM
-      kotlin/.../Discos.kt                 "Importar discos…": seletor do Android, valida o PVD e copia para isos/discoN.bin
+      kotlin/.../MainActivity.kt           launcher: logo, janela dos discos (importar, progresso), Jogar
+      kotlin/.../Visual.kt                 identidade visual: paleta, janelas no estilo do jogo, botões com foco, logo
+      kotlin/.../Discos.kt                 importação: seletor do Android, valida o PVD e copia para isos/discoN.bin
+      kotlin/.../Abrir.kt                  prepara o runtime e abre uma tela do processo ":jvm"
+      kotlin/.../DiagnosticoActivity.kt    testes M1/M2/M3a, log, "Jogo (sem checar discos)"
+      res/                                 tema (azul-noite), ícone adaptativo; drawable/orbe é gerado de
+                                           gfx/textures/icon.png do jogo (tarefa prepararRecursos)
       kotlin/.../JvmActivity.kt            processo ":jvm": cria a HotSpot e acompanha
       kotlin/.../RuntimeInstaller.kt       extrai assets/runtime/jre25.zip para filesDir/runtime/jre25
       kotlin/.../Logs.kt, TelaDeLog.kt     log único (filesDir/logs), tela e "Salvar log…" (SAF)
@@ -57,11 +62,11 @@ Cuidado no Kotlin (inclusive `.gradle.kts`): comentários de bloco se aninham. U
 ## Testar no aparelho (sem adb)
 
 1. Copiar o APK para o aparelho (cabo, cartão ou nuvem) e abrir pelo gerenciador de arquivos. O Android pede para permitir "instalar apps desconhecidos" para esse gerenciador
-2. Abrir **SC-Android** → **M1: JVM**. Na primeira vez o runtime é extraído (cerca de 130 MB)
+2. Abrir **Severed Chains** (ícone do orbe) → **Diagnóstico** → **M1: JVM**. Na primeira vez o runtime é extraído (cerca de 130 MB)
 3. A tela da JVM mostra o log ao vivo. O resultado esperado termina em `== M1 OK: todos os testes passaram ==`
 4. **Salvar log…** → escolher uma pasta (ex.: Download). O arquivo traz o log e eventuais `hs_err_pid*.log` (crash da HotSpot)
 
-**M2 (Tela):** na tela inicial, **M2: Tela (GLES)**. Abre em tela cheia um triângulo girando sobre fundo colorido.
+**M2 (Tela):** em Diagnóstico, **M2: Tela (GLES)**. Abre em tela cheia um triângulo girando sobre fundo colorido.
 - Qualquer botão do controle troca a cor; **Y** liga/desliga o geometry shader
 - O log (canto superior) mostra GL_RENDERER/GL_VERSION, resultado dos shaders, botões/eixos e FPS a cada 2 s
 - Ciclo de vida: apertar Home e voltar ao app; o log deve mostrar "Surface perdida" e "Surface recriada"
@@ -69,8 +74,10 @@ Cuidado no Kotlin (inclusive `.gradle.kts`): comentários de bloco se aninham. U
 
 **M3a (Bibliotecas):** stb, opus, opusfile, OpenAL (bipe de 1 s) e os 6 programas de shader do jogo na GPU. Tela verde = OK, vermelha = falha.
 
-**Importar discos…:** seletor do Android; marcar os `.bin` dos 4 discos (NTSC-U), um por vez ou vários de uma vez. O app confere cada arquivo como o jogo confere (setor 16, "PLAYSTATION", ID SCUS94491/94584/94585/94586) e copia os válidos para `filesDir/jogo/isos/disco1.bin` a `disco4.bin` (~700 MB cada). Os originais só são lidos. O log diz por que um arquivo foi recusado (`.cue`, `.iso` de 2048 bytes, `.chd`, `.pbp`, outra região). O jogo exige os 4 discos em toda abertura, então as cópias ficam.
+**Launcher (tela inicial):** logo à esquerda; à direita, a janela dos 4 discos (orbe aceso = importado), mensagens e os botões **Importar discos** e **Jogar** (só com os 4 discos). Rodapé: **Salvar log** e **Diagnóstico** (testes M1/M2/M3a e log ao vivo). Tudo pelo direcional; o foco fica dourado. Se a última sessão do jogo caiu, a mensagem avisa para salvar o log.
 
-**Jogo:** abre o Severed Chains (`legend.game.Main`, diretório de trabalho `filesDir/jogo`). Sem os discos, para na tela que pede os 4 discos. Com eles, a primeira abertura extrai os arquivos para `filesDir/jogo/files` e vai para a tela título. A primeira abertura depois de instalar o APK copia cerca de 75 MB de jars e arquivos. **Voltar** fecha.
+**Importar discos:** seletor do Android; marcar os `.bin` dos 4 discos (NTSC-U), um por vez ou vários de uma vez. O app confere cada arquivo como o jogo confere (setor 16, "PLAYSTATION", ID SCUS94491/94584/94585/94586) e copia os válidos para `filesDir/jogo/isos/disco1.bin` a `disco4.bin` (~700 MB cada). Os originais só são lidos. O log diz por que um arquivo foi recusado (`.cue`, `.iso` de 2048 bytes, `.chd`, `.pbp`, outra região). O jogo exige os 4 discos em toda abertura, então as cópias ficam.
+
+**Jogar:** abre o Severed Chains em tela cheia (`legend.game.Main`, diretório de trabalho `filesDir/jogo`), sem log por cima. Sem os discos (só pelo Diagnóstico), para na tela que pede os 4 discos. Com eles, a primeira abertura extrai os arquivos para `filesDir/jogo/files` e vai para a tela título. A primeira abertura depois de instalar o APK copia cerca de 75 MB de jars e arquivos. **Voltar** fecha.
 
 O que o teste M1 confere: propriedades da JVM (`os.arch=aarch64`, `java.version=25.0.5`), recursos do Java 25, arquivos, zip nativo, threads, FFM (`getpid`) e um benchmark de 5 rodadas (as rodadas devem ficar mais rápidas com o JIT C2).
