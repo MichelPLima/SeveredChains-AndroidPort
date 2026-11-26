@@ -1,6 +1,6 @@
 Atualizado: 2026-11-25
 
-Fase: 3 (M3 "Jogo" em andamento: etapas 1 e 2 OK no aparelho; etapa 3, discos, implementada e aguardando teste). Fases 0 e 2 (M1) concluídas; Fase 1 (Termux) cancelada
+Fase: 3 (M3 "Jogo": etapas 1 a 3 OK no aparelho; o jogo roda até o primeiro submap, com bugs visuais a investigar). Fases 0 e 2 (M1) concluídas; Fase 1 (Termux) cancelada
 
 Feito:
 - Estrutura do repositório e docs iniciais; levantamento do upstream no commit edcf232
@@ -35,13 +35,22 @@ Feito:
   - Jogo em tela cheia sem o log por cima (fica só nos testes ou se a JVM não subir); cabeçalho do log ganhou resolução e densidade da tela
   - Discos.importar avisa a tela por eventos (Discos.Andamento)
   - Não visto no aparelho: o PC não roda a interface Android. Pedir print ao Michel
+- Teste M3c (0.5.1-m3c, 2026-11-26) no Odin: **o jogo roda**
+  - Importação: os 4 .bin reconhecidos (SCUS94491/94584/94585/94586; 462, 549, 533 e 713 MB), cópia de 0,2 a 0,4 s por disco
+  - Unpacker: "Found disk 1..4", extração completa em 10 s (no PC, ~53 s), patches de script aplicados
+  - FMV do disco STR/DEMOH.IKI (MDEC em Java) tocou; tela título; opções (config salvo); New Campaign; FMV STR/OPENH.IKI; submap cut 675 com cartão de capítulo; transição para o cut 676. Música (sequências) iniciada
+  - Tela do launcher: janela de 1920x1025 px, 369 dpi, densidade 2,30625 (= 832x444 dp)
+  - **Bugs visuais relatados pelo Michel** ("vários") que o log não mostra: o GlesApi não registra glGetError nem erros de draw. Faltam prints/descrição de cada bug para diagnosticar
+  - **Crash ao sair** (Voltar): onClose em Scus94491BpeSegment.bindRendererEvents (linha 216) chama javafx.application.Platform.exit() → NoClassDefFoundError (JavaFX fora do APK) → "Crash detected", o jogo gera um "recovery save" e chama System.exit; o bionic imprime FORTIFY (mutex destruído) na saída. Correção prevista: patch Android que pula o Platform.exit() quando o JavaFX não está no classpath (junto com o Discord desligado, patch 0003)
 
-Próximo passo:
-- Michel instala dist/sc-android-m3c.apk (0.5.1-m3c), confere o launcher (print em logs/ ajuda a ajustar o visual), importa os 4 .bin, toca em "Jogar" (a primeira abertura extrai os arquivos: no PC foram ~53 s) e traz o log. Esperado: Found disk 1..4, extração, scripts aplicados e a tela título (etapa 4)
-- Depois: M4 (áudio do jogo, FMVs do disco, Discord off no patch 0003, pausa/retomada, saves, saída limpa)
+Próximo passo (nova sessão a partir daqui):
+1. Bugs visuais: Michel traz prints (logs/) e descreve cada bug (onde: FMV, título, menus, submap; o que: cor, textura, transparência, geometria, piscar). Comparar com o baseline do PC (GL 3.3). Suspeitos naturais: diferenças GL 3.3 x GLES 3.2 no GlesApi (formatos de textura, blend/translucência, profundidade, geometry shader na Adreno) e a transpilação 330 → GLSL ES 320 (precisão mediump, conversões). Para ver mais no log: instrumentar o GlesApi (glGetError após draws, KHR_debug/glDebugMessageCallback se a Adreno expuser) num patch de diagnóstico
+2. Patch 0003 (Android): Discord desligado + pular javafx Platform.exit() no onClose (crash ao sair)
+3. Print do launcher para ajustar o visual (832x444 dp no Odin)
+4. Depois: M4 (áudio do jogo conferido, pausa/retomada, saves, saída limpa sem FORTIFY)
 
 Bloqueios:
-- nenhum
+- Bugs visuais sem descrição: o log não mostra erros de renderização
 
 Notas:
 - Aparelho: AYN Odin 2 Portal (Snapdragon 8 Gen 2 / Adreno 740, 16:9). Sem adb: Michel copia e instala tudo manualmente
