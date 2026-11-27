@@ -76,7 +76,7 @@ Feito:
 
 Próximo passo (nova sessão a partir daqui):
 1. Michel testa o 0.6.0 (dist/sc-android-m3c.apk, ainda com a chave de debug, instala por cima): versão "3.0.0 - Android 0.6.0" na tela título; launcher com botão Créditos (lista, leitor de licença, links) e linha de atualizações (versão, canal Estável/Teste, Verificar; sem o repositório público a verificação mostra "não deu para verificar"); "About" do jogo abrindo links no navegador; Discord fora do log
-2. Repositório MichelPLima/SeveredChains-AndroidPort criado privado (2026-11-26), branch main, README público, menções pessoais neutralizadas, logo do launcher mantido (decisão do Michel). Falta: Michel conferir no GitHub e então tornar público. Fork do Severed Chains: opcional (cópia de segurança do commit base edcf232)
+2. Repositório público MichelPLima/SeveredChains-AndroidPort (2026-11-26): branch main, README com seção "Reporting a problem" (log pelo Salvar log + print), formulário de issue (.github/ISSUE_TEMPLATE/problema.yml), menções pessoais neutralizadas, logo do launcher mantido. Fork do Severed Chains descartado pelo Michel
 3. Chave de assinatura (Michel, docs/processos/assinatura.md). A troca da chave de debug exige desinstalar uma vez no Odin (perde discos importados, extração e saves)
 4. CI (GitHub Actions, grátis em repositório público): JRE 25 Android e natives do LWJGL (liblwjgl, opengles, stb, 16 KB) compilados por nós; depois o APK de release pela tag
 5. Primeiro release (docs/processos/publicar-versao.md) e teste do atualizador de ponta a ponta

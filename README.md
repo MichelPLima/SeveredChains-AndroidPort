@@ -16,6 +16,17 @@ The launcher checks this repository's Releases for updates (channel **Stable**, 
 
 Requirements: Android 9 or newer, arm64, OpenGL ES 3.2, and several GB of free space. A controller is recommended.
 
+## Reporting a problem
+
+Open an [Issue](../../issues/new/choose) and **attach the log**. Without it, most problems can't be investigated.
+
+1. Reproduce the problem (or let the game crash), then go back to the launcher.
+2. In the launcher, tap **Save log** (bottom left) and choose where to save it. The file is named `sc-android-log-<date>.txt`.
+3. When the problem is visual (wrong colors, missing characters, glitches), also attach a **screenshot** taken at the moment it happens (on most devices: Power + Volume Down).
+4. Say where it happened (opening video, title screen, menu, map, battle) and what you expected to see.
+
+The log has the app version, device model, Android version and graphics driver, the names of the disc files you imported and of your campaigns and saves, and what the game was doing. Nothing else about you. You can write in English, Portuguese or Spanish.
+
 ## How it works
 
 - Severed Chains is written in Java. The app carries a Java 25 runtime (HotSpot) and runs the game in a separate process, drawing with OpenGL ES 3.2 through LWJGL.
@@ -32,4 +43,4 @@ Requirements: Android 9 or newer, arm64, OpenGL ES 3.2, and several GB of free s
 
 ## Português
 
-Port não oficial do [Severed Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains) para Android, feito com ajuda de IA (Claude Code), sem vínculo com a equipe do Severed Chains nem com a Sony. O app não traz dados do jogo: você importa os 4 discos (`.bin` da versão americana) da sua própria cópia. Problemas: abra uma [Issue](../../issues) aqui, não com a equipe do Severed Chains. Instruções de build e documentação de desenvolvimento em [`docs/`](docs) e [`android/README.md`](android/README.md).
+Port não oficial do [Severed Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains) para Android, feito com ajuda de IA (Claude Code), sem vínculo com a equipe do Severed Chains nem com a Sony. O app não traz dados do jogo: você importa os 4 discos (`.bin` da versão americana) da sua própria cópia. Problemas: abra uma [Issue](../../issues/new/choose) aqui, não com a equipe do Severed Chains, e anexe o log (no launcher, **Salvar log**) e, se o problema for visual, um print do momento. Instruções de build e documentação de desenvolvimento em [`docs/`](docs) e [`android/README.md`](android/README.md).

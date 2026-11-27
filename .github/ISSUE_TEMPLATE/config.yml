@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Severed Chains (PC version)
+    url: https://github.com/Legend-of-Dragoon-Modding/Severed-Chains/issues
+    about: Problems that also happen on the PC version belong to the Severed Chains project, not to this Android port.

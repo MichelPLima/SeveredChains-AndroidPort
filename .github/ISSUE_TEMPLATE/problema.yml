@@ -1,0 +1,53 @@
+name: Problem / Problema
+description: Something wrong in the Android port (crash, visual glitch, controls, discs, updates)
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! English, Portuguese or Spanish are fine.
+        **Attach the log**: in the launcher, tap **Save log** (bottom left), save the file and drag it into the field below. Without the log, most problems can't be investigated.
+        If the problem is visual, also attach a **screenshot** taken at the moment it happens (usually Power + Volume Down).
+
+        Obrigado! Pode escrever em português. Anexe o log (no launcher, **Salvar log**) e, se o problema for visual, um print do momento.
+  - type: input
+    id: versao
+    attributes:
+      label: App version / Versão do app
+      description: Shown at the bottom left of the launcher (e.g. 0.6.0)
+    validations:
+      required: true
+  - type: input
+    id: aparelho
+    attributes:
+      label: Device and Android version / Aparelho e versão do Android
+      placeholder: e.g. AYN Odin 2 Portal, Android 13
+    validations:
+      required: true
+  - type: dropdown
+    id: onde
+    attributes:
+      label: Where did it happen? / Onde aconteceu?
+      options:
+        - Launcher (discs, updates, credits)
+        - Opening video / FMV
+        - Title screen / menus
+        - Map (field)
+        - Battle
+        - Other / Outro
+    validations:
+      required: true
+  - type: textarea
+    id: oque
+    attributes:
+      label: What happened? / O que aconteceu?
+      description: What you saw, and what you expected to see. Steps to reproduce if you know them.
+    validations:
+      required: true
+  - type: textarea
+    id: anexos
+    attributes:
+      label: Log and screenshot / Log e print
+      description: Drag the log file (sc-android-log-....txt) and, for visual problems, the screenshot here.
+    validations:
+      required: true
