@@ -116,7 +116,8 @@ Formato: data, decisão, motivo, status. Não apagar entradas antigas: marcar co
 - JRE 25: os mesmos scripts que geraram o JRE comunitário (kelvinalumotos/android-openjdk-build-multiarch @ `de2b663`, OpenJDK `jdk-25.0.5-ga`, NDK r28), rodando no nosso CI. O `termux-elf-cleaner`, que os scripts baixariam sem versão, é fixado em `f9273bc`. Os scripts não declaram licença; como fazem parte do código-fonte correspondente de um binário GPL, o release leva um snapshot deles junto com o OpenJDK modificado, FreeType e CUPS (`fontes-jre-25.tar`)
 - LWJGL 3.4.3: código oficial + configuração Android do LWJGL3-Android-Builder (Open-Launcher-Collective @ `0770b1d`; o LWJGL não traz configuração para Android) + libffi 3.8.0 (pacote oficial, SHA-256 fixo) compilado no próprio workflow (no lugar do `libffi.a` pré-compilado deles) + NDK r30 (alinhamento de 16 KB, conferido no workflow)
 - Motivo: decisão de 2026-11-25 reconfirmada pelo Michel (confiança, continuidade, 16 KB)
-- Status: aceita (primeiras execuções em andamento)
+- Resultado (2026-11-26): releases `deps-lwjgl-3.4.3-1` (zip 1,3 MB; todas as bibliotecas com LOAD em 0x4000) e `deps-jre-25.0.5-1` (JRE 48,8 MB, código-fonte 147 MB; JAVA_VERSION 25.0.5, GNU_HASH presente, nada em 4 KB). Build do JRE: ~25 min no runner. O APK 0.6.1 já usa os dois
+- Status: aceita, em uso desde 0.6.1
 
 ## Em aberto
 - Shaders: conversão em runtime ou pré-conversão no build

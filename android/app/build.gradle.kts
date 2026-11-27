@@ -7,13 +7,15 @@ plugins {
     id("com.android.application")
 }
 
-// Binários comunitários fixados até termos os nossos no CI (docs/context/04-decisoes.md, 2026-11-25).
-// Runtime Java 25 para Android (bionic, aarch64)
-val urlRuntimeJre = "https://github.com/kelvinalumotos/android-openjdk-build-multiarch/releases/download/jre-25.0.5-2/JRE-25.zip"
-val shaRuntimeJre = "2d2ed1cb285ea31fc7cccd20956e68e304ff95fc945b4f877e4f9ccae1e4f884"
-// Natives LWJGL 3.4.3 para Android arm64 (Open-Launcher-Collective, CI a partir da tag oficial 3.4.3)
-val urlNativesLwjgl = "https://github.com/Open-Launcher-Collective/LWJGL3-Android-Builder/releases/download/android-lwjgl-3.4.3/lwjgl-3.4.3.zip"
-val shaNativesLwjgl = "dcc658ded7eee2f332ff77afeafb48194fb22b3910180a5e550df8fa3c83a6dd"
+// Java e natives do LWJGL compilados pelo nosso CI (.github/workflows/dep-*.yml; docs/context/04-decisoes.md), baixados dos
+// releases deps-* deste repositório com SHA-256 fixo.
+// Runtime Java 25 para Android (bionic, aarch64): OpenJDK jdk-25.0.5-ga; o release leva o código-fonte correspondente
+val urlRuntimeJre = "https://github.com/MichelPLima/SeveredChains-AndroidPort/releases/download/deps-jre-25.0.5-1/JRE-25-android-aarch64.zip"
+val shaRuntimeJre = "7742c3c568c479da920e837eb788357426d20e42e58db2bc822dc0b11de2a2e1"
+// Natives LWJGL 3.4.3 para Android arm64, compilados pelo nosso CI (.github/workflows/dep-lwjgl.yml): tag oficial,
+// libffi compilado no workflow, NDK r30 (alinhamento de 16 KB)
+val urlNativesLwjgl = "https://github.com/MichelPLima/SeveredChains-AndroidPort/releases/download/deps-lwjgl-3.4.3-1/lwjgl-3.4.3-android-arm64.zip"
+val shaNativesLwjgl = "6aa828dafe11fde9db1cdb758e99f5a59eabf0ec4703725e7e0b6f7568716720"
 // Só os natives que o jogo usa (os demais do zip ficam de fora do APK)
 val nativesLwjglUsados = listOf("liblwjgl.so", "liblwjgl_opengles.so", "liblwjgl_stb.so")
 // Natives de terceiros compilados por nós (natives/build-android.sh), mesmos commits do LWJGL 3.4.3
@@ -52,8 +54,8 @@ android {
         applicationId = "io.github.michelplima.severedchains"
         minSdk = 28
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.6.0"
+        versionCode = 15
+        versionName = "0.6.1"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -129,7 +131,13 @@ abstract class BaixarVerificado : DefaultTask() {
             temp.delete()
             throw GradleException("SHA-256 não confere para ${url.get()}: esperado ${sha256.get()}, obtido $obtido")
         }
-        temp.renameTo(arquivo)
+        // No Windows o renameTo não substitui um arquivo existente (ex.: versão antiga no cache com outro SHA-256)
+        if(arquivo.exists() && !arquivo.delete()) {
+            throw GradleException("Não consegui apagar ${arquivo.path} para trocar pela versão nova")
+        }
+        if(!temp.renameTo(arquivo)) {
+            throw GradleException("Não consegui mover ${temp.path} para ${arquivo.path}")
+        }
     }
 
     private fun sha256De(f: File): String {

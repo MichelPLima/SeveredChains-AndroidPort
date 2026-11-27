@@ -14,6 +14,9 @@ object Projeto {
     /** Releases do GitHub: cada versão publicada leva o APK assinado como anexo */
     const val API_RELEASES = "https://api.github.com/repos/$REPOSITORIO/releases"
 
+    /** Release do Java compilado pelo CI, com o código-fonte correspondente (GPL-2.0 com Classpath Exception) */
+    const val URL_FONTES_JRE = "$URL_CODIGO/releases/tag/deps-jre-25.0.5-1"
+
     const val URL_SEVERED_CHAINS = "https://github.com/Legend-of-Dragoon-Modding/Severed-Chains"
 
     /** Commit do Severed Chains em que o port se baseia (submódulo upstream) */
