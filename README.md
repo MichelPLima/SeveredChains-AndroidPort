@@ -4,7 +4,7 @@ Unofficial Android port of [Severed Chains](https://github.com/Legend-of-Dragoon
 
 This port is made with the help of AI (Claude Code). It is not affiliated with the Severed Chains team or with Sony. **Please report problems in this repository's [Issues](../../issues), not to the Severed Chains team.**
 
-**Status:** in testing, no public release yet. Tested on an AYN Odin 2 Portal (Snapdragon 8 Gen 2, Android 13): title screen, field, battles and cutscenes run.
+**Status:** early version (0.7). Download it from [Releases](../../releases/latest). Tested on an AYN Odin 2 Portal (Snapdragon 8 Gen 2, Android 13): title screen, field, battles and cutscenes run. Reports from other devices are welcome.
 
 ## Installing
 
@@ -43,4 +43,4 @@ The log has the app version, device model, Android version and graphics driver, 
 
 ## Português
 
-Port não oficial do [Severed Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains) para Android, feito com ajuda de IA (Claude Code), sem vínculo com a equipe do Severed Chains nem com a Sony. O app não traz dados do jogo: você importa os 4 discos (`.bin` da versão americana) da sua própria cópia. Problemas: abra uma [Issue](../../issues/new/choose) aqui, não com a equipe do Severed Chains, e anexe o log (no launcher, **Salvar log**) e, se o problema for visual, um print do momento. Instruções de build e documentação de desenvolvimento em [`docs/`](docs) e [`android/README.md`](android/README.md).
+Port não oficial do [Severed Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains) para Android, feito com ajuda de IA (Claude Code), sem vínculo com a equipe do Severed Chains nem com a Sony. O app não traz dados do jogo: você importa os 4 discos (`.bin` da versão americana) da sua própria cópia. Baixe o APK em [Releases](../../releases/latest). Problemas: abra uma [Issue](../../issues/new/choose) aqui, não com a equipe do Severed Chains, e anexe o log (no launcher, **Salvar log**) e, se o problema for visual, um print do momento. Instruções de build e documentação de desenvolvimento em [`docs/`](docs) e [`android/README.md`](android/README.md).

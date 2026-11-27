@@ -15,6 +15,7 @@ O atualizador do launcher (`Atualizacao.kt`) lê os Releases do repositório pú
 O APK de release é gerado neste PC (a chave não vai para o GitHub; decisão em docs/context/04-decisoes.md).
 
 1. `android/app/build.gradle.kts`: subir `versionCode` e `versionName`; commit e push
+   - Se as bibliotecas Java do jogo mudaram (atualização do upstream), o build falha com "Jars sem licença": gerar um APK com `assembleDebug` antes, rodar `python -I scripts/gerar-licencas-java.py <apk>` e fazer commit de `assets/licencas/bibliotecas-java.txt`
 2. Git Bash na raiz do repositório:
    ```bash
    scripts/publicar-versao.sh            # canal Estável

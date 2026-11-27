@@ -76,7 +76,8 @@
     <string name="creditos_build_android">Android build: %s</string>
     <string name="creditos_ffmpeg_descricao">Plays the opening video. FFmpeg built without GPL parts, with OpenSSL (Apache-2.0).</string>
     <string name="creditos_java_nome">Java libraries used by the game</string>
-    <string name="creditos_java_descricao">log4j, JOML, fastutil, ANTLR, Apache Commons, JavaCV and others, each under its own license (Apache-2.0, MIT, BSD…). List in the Severed Chains build file.</string>
+    <string name="creditos_java_descricao">log4j, JOML, fastutil, ANTLR, Apache Commons, JavaCV and others, 75 libraries, each under its own license. Tap License for the full list with license, project and notices.</string>
+    <string name="creditos_java_licencas">Apache-2.0, MIT, BSD, AGPL-3.0 and others</string>
     <string name="creditos_java_nao_instalado">This license comes with Java, which is installed the first time the game opens.</string>
 
     <!-- Atualizações -->

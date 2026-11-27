@@ -54,8 +54,8 @@ android {
         applicationId = "io.github.michelplima.severedchains"
         minSdk = 28
         targetSdk = 36
-        versionCode = 16
-        versionName = "0.6.2"
+        versionCode = 17
+        versionName = "0.7.0"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -168,6 +168,8 @@ abstract class PrepararAssets : DefaultTask() {
     /** Na ordem do classpath; jars com o mesmo nome entram uma vez só (o primeiro) */
     @get:InputFiles abstract val classpath: ConfigurableFileCollection
     @get:InputFiles abstract val arquivosDoJogo: ConfigurableFileCollection
+    /** Licenças das bibliotecas Java (scripts/gerar-licencas-java.py): tem de listar todo jar de terceiros do classpath */
+    @get:InputFile abstract val licencasJava: RegularFileProperty
     @get:Internal abstract val raizDoJogo: DirectoryProperty
     @get:OutputDirectory abstract val saida: DirectoryProperty
 
@@ -186,6 +188,12 @@ abstract class PrepararAssets : DefaultTask() {
             }
         }
         File(dir, "java/classpath.txt").writeText(nomes.joinToString("\n"))
+        // Cada jar de terceiros precisa estar na lista de licenças da tela Créditos
+        val listados = licencasJava.get().asFile.readLines().filter { it.contains(".jar  (") }.map { it.substringBefore("  (") }.toSet()
+        val faltando = nomes.filter { it != "lod-game-snapshot.jar" && it != "runtime-test.jar" && it !in listados }
+        if(faltando.isNotEmpty()) {
+            throw GradleException("Jars sem licença em assets/licencas/bibliotecas-java.txt: $faltando. Gere um APK e rode: python -I scripts/gerar-licencas-java.py <apk>")
+        }
         // Arquivos de suporte do jogo, listados para o app copiar sem varrer os assets
         val raiz = raizDoJogo.get().asFile
         val caminhos = arquivosDoJogo.files.map { it.relativeTo(raiz).invariantSeparatorsPath }.sorted()
@@ -309,6 +317,7 @@ val prepararAssets = tasks.register<PrepararAssets>("prepararAssets") {
     classpath.from(projetoTeste.configurations.named("runtimeClasspath"))
     classpath.from(tarefaJarTeste.flatMap { it.archiveFile })
     raizDoJogo = pastaDistribuicaoDoJogo
+    licencasJava = layout.projectDirectory.file("src/main/assets/licencas/bibliotecas-java.txt")
     arquivosDoJogo.from(pastaDistribuicaoDoJogo.asFileTree.matching { include(arquivosDeSuporteDoJogo) })
 }
 

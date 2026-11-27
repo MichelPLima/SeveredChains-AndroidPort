@@ -73,7 +73,7 @@ class CreditosActivity : Activity() {
             Componente("libc++", "LLVM Project", null,
                 "Apache-2.0 WITH LLVM-exception", listOf("asset:licencas/libcxx.txt"), "https://libcxx.llvm.org"),
             Componente(getString(R.string.creditos_java_nome), colab("Apache, JOML, ANTLR, fastutil"), getString(R.string.creditos_java_descricao),
-                null, emptyList(), "${Projeto.URL_SEVERED_CHAINS}/blob/main/build.gradle"),
+                getString(R.string.creditos_java_licencas), listOf("asset:licencas/bibliotecas-java.txt"), null),
         )
     }
 

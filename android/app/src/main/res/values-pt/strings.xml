@@ -76,7 +76,8 @@
     <string name="creditos_build_android">Build Android: %s</string>
     <string name="creditos_ffmpeg_descricao">Toca o vídeo de abertura. FFmpeg compilado sem partes GPL, com OpenSSL (Apache-2.0).</string>
     <string name="creditos_java_nome">Bibliotecas Java usadas pelo jogo</string>
-    <string name="creditos_java_descricao">log4j, JOML, fastutil, ANTLR, Apache Commons, JavaCV e outras, cada uma com a própria licença (Apache-2.0, MIT, BSD…). Lista no arquivo de build do Severed Chains.</string>
+    <string name="creditos_java_descricao">log4j, JOML, fastutil, ANTLR, Apache Commons, JavaCV e outras, 75 bibliotecas, cada uma com a própria licença. Toque em Licença para ver a lista completa com licença, projeto e avisos.</string>
+    <string name="creditos_java_licencas">Apache-2.0, MIT, BSD, AGPL-3.0 e outras</string>
     <string name="creditos_java_nao_instalado">Esta licença vem com o Java, que é instalado na primeira vez que o jogo abre.</string>
 
     <!-- Atualizações -->
