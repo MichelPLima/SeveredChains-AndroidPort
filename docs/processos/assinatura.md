@@ -2,6 +2,15 @@
 
 O Android só instala uma versão por cima da outra se as duas forem assinadas com a mesma chave. O atualizador do launcher depende disso. A chave é para sempre: se ela se perder, quem já instalou não recebe mais atualizações (teria de desinstalar e perder discos importados e saves).
 
+## Chave do projeto
+
+Criada em 2026-11-26 (`C:\Users\<usuário>\.chaves\severedchains.jks`, apelido `severedchains`, PKCS12, RSA 4096, validade de 100 anos). Certificado público, gravado em todo APK:
+
+- `CN=MichelPLima, C=BR`
+- SHA-256: `234513059f658a41888c000cd457e8f399f19a219e935e0312e8300c2a61f8b5`
+
+Para conferir um APK: `apksigner verify --print-certs arquivo.apk` (Android SDK, build-tools).
+
 ## Criar a chave (uma vez só)
 
 No PowerShell, com o JDK 17 ou 25 no PATH:

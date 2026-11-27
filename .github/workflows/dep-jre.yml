@@ -1,0 +1,139 @@
+# Java 25 (OpenJDK) para Android aarch64, compilado do código oficial (docs/context/04-decisoes.md, build próprio antes de distribuir).
+#
+# Usa os scripts do android-openjdk-build-multiarch (kelvinalumotos, buildjre25) num commit fixo: baixam o NDK r28 e o OpenJDK
+# jdk-25.0.5-ga, aplicam os patches para Android e empacotam o JRE-25.zip (o mesmo processo do JRE comunitário usado até agora).
+# O termux-elf-cleaner, que os scripts baixariam sem versão fixa, é clonado antes num commit fixo.
+#
+# GPL-2.0 (com Classpath Exception): o release leva junto o código-fonte correspondente (OpenJDK com os patches, scripts de build,
+# FreeType e CUPS usados no build).
+#
+# Publica o release deps-jre-<versão>-<n> (o atualizador do app ignora tags que não são vX.Y.Z).
+
+name: "Dependência: JRE 25 (Android aarch64)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      publicar:
+        description: "Tag do release a publicar (ex.: deps-jre-25.0.5-1). Vazio = só gera o artefato"
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  SCRIPTS_REPO: kelvinalumotos/android-openjdk-build-multiarch
+  SCRIPTS_REF: de2b6630874d40586b2c1bc40b860b87a1822a99
+  ELF_CLEANER_REF: f9273bcb37bf4c187123438566657fa5ac40cd51
+  FREETYPE_VERSAO: "2.10.0"
+  JDK_TAG: jdk-25.0.5-ga
+
+jobs:
+  jre:
+    name: JRE 25 ${{ github.event.inputs.publicar || 'teste' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - name: Scripts de build (fixos)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SCRIPTS_REPO }}
+          ref: ${{ env.SCRIPTS_REF }}
+          path: build
+
+      - name: termux-elf-cleaner (fixo)
+        uses: actions/checkout@v4
+        with:
+          repository: termux/termux-elf-cleaner
+          ref: ${{ env.ELF_CLEANER_REF }}
+          path: build/termux-elf-cleaner
+
+      - name: Liberar espaço em disco
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Boot JDK 24
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "24"
+
+      - name: Dependências do build
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install cmake autoconf python3 python-is-python3 unzip zip systemtap-sdt-dev libxtst-dev libasound2-dev \
+            libelf-dev libfontconfig1-dev libx11-dev libxext-dev libxrandr-dev libxrender-dev libxt-dev
+
+      - name: Código dos scripts (para o release)
+        run: |
+          mkdir -p fontes
+          git -C build archive --format=tar.gz --prefix=android-openjdk-build-multiarch/ -o "$PWD/fontes/android-openjdk-build-multiarch-${SCRIPTS_REF}.tar.gz" HEAD
+          git -C build/termux-elf-cleaner archive --format=tar.gz --prefix=termux-elf-cleaner/ -o "$PWD/fontes/termux-elf-cleaner-${ELF_CLEANER_REF}.tar.gz" HEAD
+
+      # O runner traz um NDK próprio em ANDROID_NDK_HOME; sem ele, os scripts baixam o r28 que fixam
+      - name: Compilar
+        working-directory: build
+        run: env -u ANDROID_NDK_HOME -u ANDROID_NDK_ROOT -u ANDROID_NDK_LATEST_HOME TARGET_VERSION=25 BOOT_JDK="$JAVA_HOME" bash 1_ci_build_arch_aarch64.sh
+
+      # O linker do Android recusa bibliotecas sem DT_HASH/DT_GNU_HASH; e todas precisam de alinhamento de 16 KB
+      - name: Conferir o JRE
+        run: |
+          rm -rf conferir && mkdir conferir
+          unzip -q build/JRE-25.zip -d conferir
+          readelf -d conferir/lib/server/libjvm.so | grep -E '\((GNU_)?HASH\)'
+          falhou=0
+          for f in $(find conferir -name '*.so'); do
+            for a in $(readelf -lW "$f" | awk '$1=="LOAD"{print $NF}' | sort -u); do
+              if [ $((a)) -lt 16384 ]; then echo "4 KB: $f ($a)"; falhou=1; fi
+            done
+          done
+          grep -E 'JAVA_VERSION|IMPLEMENTOR' conferir/release
+          exit $falhou
+
+      - name: Código-fonte correspondente (GPL)
+        run: |
+          tar czf "fontes/openjdk-${JDK_TAG}-android-patched.tar.gz" --exclude=openjdk/build --exclude=openjdk/.git -C build openjdk
+          wget -nv -O "fontes/freetype-${FREETYPE_VERSAO}.tar.gz" "https://downloads.sourceforge.net/project/freetype/freetype2/${FREETYPE_VERSAO}/freetype-${FREETYPE_VERSAO}.tar.gz"
+          wget -nv -O fontes/cups-2.2.4-source.tar.gz https://github.com/apple/cups/releases/download/v2.2.4/cups-2.2.4-source.tar.gz
+          ls -lh fontes
+
+      - name: Empacotar
+        run: |
+          cp build/JRE-25.zip JRE-25-android-aarch64.zip
+          cat > ORIGEM-jre.txt <<EOF
+          OpenJDK ${JDK_TAG} (https://github.com/openjdk/jdk25u) para Android aarch64
+          Scripts: https://github.com/${SCRIPTS_REPO} @ ${SCRIPTS_REF}
+          termux-elf-cleaner: https://github.com/termux/termux-elf-cleaner @ ${ELF_CLEANER_REF}
+          FreeType ${FREETYPE_VERSAO}, CUPS 2.2.4 (cabeçalhos)
+          Código-fonte correspondente: arquivos fontes-*.tar.gz deste release
+          Build: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+          tar cf fontes-jre-25.tar -C fontes .
+          sha256sum JRE-25-android-aarch64.zip fontes-jre-25.tar | tee SHA256SUMS-jre.txt
+
+      - name: Artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: jre-25-android-aarch64
+          path: |
+            JRE-25-android-aarch64.zip
+            ORIGEM-jre.txt
+            SHA256SUMS-jre.txt
+
+      - name: Artefato (código-fonte)
+        uses: actions/upload-artifact@v4
+        with:
+          name: jre-25-fontes
+          path: fontes-jre-25.tar
+
+      - name: Publicar release
+        if: github.event.inputs.publicar != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.publicar }}
+        run: |
+          gh release create "$TAG" JRE-25-android-aarch64.zip fontes-jre-25.tar ORIGEM-jre.txt SHA256SUMS-jre.txt \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false --title "$TAG" \
+            --notes "OpenJDK ${JDK_TAG} para Android aarch64 (16 KB), compilado por este repositório, com o código-fonte correspondente (GPL-2.0 com Classpath Exception). Não é uma versão do app."

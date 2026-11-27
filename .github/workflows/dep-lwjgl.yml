@@ -1,0 +1,167 @@
+# Natives do LWJGL para Android arm64, compilados do código oficial (docs/context/04-decisoes.md, build próprio antes de distribuir).
+#
+# - LWJGL: tag oficial (BSD-3-Clause)
+# - Configuração Android (build.xml, version.script e dois headers): LWJGL3-Android-Builder (Open-Launcher-Collective) num commit
+#   fixo; o LWJGL não traz configuração para Android
+# - libffi: compilado aqui a partir da tag oficial (o builder deles usa um libffi.a pré-compilado)
+# - NDK r30: alinhamento de 16 KB por padrão (o builder deles usa o r27, que gera 4 KB)
+#
+# Publica o release deps-lwjgl-<versão>-<n> (o atualizador do app ignora tags que não são vX.Y.Z).
+
+name: "Dependência: LWJGL (Android arm64)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      publicar:
+        description: "Tag do release a publicar (ex.: deps-lwjgl-3.4.3-1). Vazio = só gera o artefato"
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  LWJGL_VERSAO: "3.4.3"
+  CONFIG_REPO: Open-Launcher-Collective/LWJGL3-Android-Builder
+  CONFIG_REF: 0770b1d494af3c1152adefed4c601f9e8c763d81
+  LIBFFI_REF: v3.8.0
+  NDK_VERSAO: "30.0.16248370"
+  API: "26"
+
+jobs:
+  lwjgl:
+    name: LWJGL ${{ github.event.inputs.publicar || 'teste' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Código do LWJGL
+        uses: actions/checkout@v4
+        with:
+          repository: LWJGL/lwjgl3
+          ref: ${{ env.LWJGL_VERSAO }}
+          path: lwjgl
+          fetch-depth: 1
+
+      - name: Configuração Android (LWJGL3-Android-Builder)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CONFIG_REPO }}
+          ref: ${{ env.CONFIG_REF }}
+          path: config-android
+
+      - name: Código do libffi
+        uses: actions/checkout@v4
+        with:
+          repository: libffi/libffi
+          ref: ${{ env.LIBFFI_REF }}
+          path: libffi
+          fetch-depth: 1
+
+      - name: Ferramentas
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ant libx11-dev autoconf automake libtool texinfo zip
+
+      - name: Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: NDK
+        run: |
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSAO" > /dev/null
+          NDK="$ANDROID_SDK_ROOT/ndk/$NDK_VERSAO"
+          test -x "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android${API}-clang++"
+          echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          ln -sfn "$NDK" "$ANDROID_SDK_ROOT/ndk-bundle"
+          echo "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
+
+      - name: libffi (estático, aarch64-linux-android)
+        working-directory: libffi
+        run: |
+          TC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          ./autogen.sh
+          ./configure --host=aarch64-linux-android --disable-shared --enable-static --with-pic --disable-docs \
+            --disable-multi-os-directory \
+            CC="$TC/aarch64-linux-android${API}-clang" AR="$TC/llvm-ar" RANLIB="$TC/llvm-ranlib" CFLAGS="-O2 -fPIC"
+          make -j"$(nproc)"
+          LIBFFI_A=$(find . -path '*/.libs/libffi.a' | head -n1)
+          test -n "$LIBFFI_A"
+          echo "LIBFFI_A=$PWD/$LIBFFI_A" >> "$GITHUB_ENV"
+
+      - name: Configuração Android no LWJGL
+        working-directory: lwjgl
+        run: |
+          C=../config-android/.github/android/3.3
+          mkdir -p config/android/arm64 bin/libs/native/android/arm64/org/lwjgl
+          cp "$C/build.xml" config/android/build.xml
+          cp "$C/version.script" config/android/version.script
+          cp "$C/compat.h" modules/lwjgl/core/src/main/c/linux/liburing/include/liburing/compat.h
+          cp "$C/LinuxConfig.h" modules/lwjgl/core/src/main/c/linux/LinuxConfig.h
+          cp "$LIBFFI_A" config/android/arm64/libffi.a
+          cp "$LIBFFI_A" bin/libs/native/android/arm64/org/lwjgl/libffi.a
+          cp -r /usr/include/X11 "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/"
+
+      - name: Compilar os natives
+        working-directory: lwjgl
+        env:
+          LWJGL_BUILD_ARCH: arm64
+          LWJGL_BUILD_TRIPLET: aarch64-linux-android${{ env.API }}
+        run: |
+          OPCOES="-Dplatform=android -Dbinding.remotery=false -Djdk25=true -Dbinding.nfd=false -Dbinding.zstd=false -Dbinding.tinyexr=false -Dbinding.jawt=false"
+          ant $OPCOES init
+          LWJGL_BUILD_OFFLINE=true ANT_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m" ant $OPCOES compile-templates compile-native
+
+      - name: Conferir alinhamento de 16 KB
+        run: |
+          mkdir -p saida
+          find lwjgl -name 'liblwjgl*.so' -exec cp {} saida/ \;
+          ls -l saida
+          falhou=0
+          for f in saida/*.so; do
+            alinhamentos=$(llvm-readelf -lW "$f" | awk '$1=="LOAD"{print $NF}' | sort -u | tr '\n' ' ')
+            echo "$(basename "$f"): $alinhamentos"
+            for a in $alinhamentos; do
+              if [ $((a)) -lt 16384 ]; then falhou=1; fi
+            done
+          done
+          for usado in liblwjgl.so liblwjgl_opengles.so liblwjgl_stb.so; do
+            test -f "saida/$usado" || { echo "faltou $usado"; falhou=1; }
+          done
+          exit $falhou
+
+      - name: Empacotar
+        run: |
+          NOME="lwjgl-${LWJGL_VERSAO}-android-arm64"
+          cp lwjgl/LICENSE.md saida/LICENSE-lwjgl.md
+          cp libffi/LICENSE saida/LICENSE-libffi.txt
+          cat > saida/ORIGEM.txt <<EOF
+          LWJGL ${LWJGL_VERSAO} (https://github.com/LWJGL/lwjgl3, tag ${LWJGL_VERSAO})
+          Configuração Android: https://github.com/${CONFIG_REPO} @ ${CONFIG_REF}
+          libffi: https://github.com/libffi/libffi @ ${LIBFFI_REF} (estático, dentro do liblwjgl.so)
+          NDK ${NDK_VERSAO}, API ${API}, alinhamento de 16 KB
+          Build: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+          (cd saida && zip -q "../$NOME.zip" *)
+          sha256sum "$NOME.zip" | tee "$NOME.zip.sha256"
+
+      - name: Artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: lwjgl-${{ env.LWJGL_VERSAO }}-android-arm64
+          path: |
+            lwjgl-*.zip
+            lwjgl-*.zip.sha256
+
+      - name: Publicar release
+        if: github.event.inputs.publicar != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.publicar }}
+        run: |
+          gh release create "$TAG" lwjgl-*.zip lwjgl-*.zip.sha256 --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --prerelease --latest=false --title "$TAG" \
+            --notes "Natives do LWJGL ${LWJGL_VERSAO} para Android arm64 (16 KB), compilados por este repositório. Origem em ORIGEM.txt dentro do zip. Não é uma versão do app."
