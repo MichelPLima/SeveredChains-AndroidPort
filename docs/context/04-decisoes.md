@@ -111,5 +111,12 @@ Formato: data, decisão, motivo, status. Não apagar entradas antigas: marcar co
 - Motivo: é a arte do próprio Severed Chains, que a mostra no repositório e na tela título do jogo; o port corre o mesmo risco que o projeto original. Escolha do Michel
 - Status: aceita
 
+## 2026-11-26: Build próprio das dependências no GitHub Actions
+- Decisão: workflows `.github/workflows/dep-jre.yml` e `dep-lwjgl.yml`, disparados à mão, publicam releases `deps-jre-*` e `deps-lwjgl-*` (pré-lançamento, fora do "latest"; o atualizador do app só considera tags `vX.Y.Z`). O build do APK passa a baixar desses releases, com SHA-256 fixo
+- JRE 25: os mesmos scripts que geraram o JRE comunitário (kelvinalumotos/android-openjdk-build-multiarch @ `de2b663`, OpenJDK `jdk-25.0.5-ga`, NDK r28), rodando no nosso CI. O `termux-elf-cleaner`, que os scripts baixariam sem versão, é fixado em `f9273bc`. Os scripts não declaram licença; como fazem parte do código-fonte correspondente de um binário GPL, o release leva um snapshot deles junto com o OpenJDK modificado, FreeType e CUPS (`fontes-jre-25.tar`)
+- LWJGL 3.4.3: código oficial + configuração Android do LWJGL3-Android-Builder (Open-Launcher-Collective @ `0770b1d`; o LWJGL não traz configuração para Android) + libffi 3.8.0 (pacote oficial, SHA-256 fixo) compilado no próprio workflow (no lugar do `libffi.a` pré-compilado deles) + NDK r30 (alinhamento de 16 KB, conferido no workflow)
+- Motivo: decisão de 2026-11-25 reconfirmada pelo Michel (confiança, continuidade, 16 KB)
+- Status: aceita (primeiras execuções em andamento)
+
 ## Em aberto
 - Shaders: conversão em runtime ou pré-conversão no build

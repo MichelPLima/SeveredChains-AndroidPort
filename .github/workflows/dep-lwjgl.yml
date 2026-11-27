@@ -3,7 +3,7 @@
 # - LWJGL: tag oficial (BSD-3-Clause)
 # - Configuração Android (build.xml, version.script e dois headers): LWJGL3-Android-Builder (Open-Launcher-Collective) num commit
 #   fixo; o LWJGL não traz configuração para Android
-# - libffi: compilado aqui a partir da tag oficial (o builder deles usa um libffi.a pré-compilado)
+# - libffi: compilado aqui a partir do pacote oficial do release, com SHA-256 fixo (o builder deles usa um libffi.a pré-compilado)
 # - NDK r30: alinhamento de 16 KB por padrão (o builder deles usa o r27, que gera 4 KB)
 #
 # Publica o release deps-lwjgl-<versão>-<n> (o atualizador do app ignora tags que não são vX.Y.Z).
@@ -25,7 +25,8 @@ env:
   LWJGL_VERSAO: "3.4.3"
   CONFIG_REPO: Open-Launcher-Collective/LWJGL3-Android-Builder
   CONFIG_REF: 0770b1d494af3c1152adefed4c601f9e8c763d81
-  LIBFFI_REF: v3.8.0
+  LIBFFI_VERSAO: "3.8.0"
+  LIBFFI_SHA256: 7da3e2d9a171eb0a038f592ecad3ff2bb2550f3496d87b3b29ad0cf4430c0db4
   NDK_VERSAO: "30.0.16248370"
   API: "26"
 
@@ -50,18 +51,10 @@ jobs:
           ref: ${{ env.CONFIG_REF }}
           path: config-android
 
-      - name: Código do libffi
-        uses: actions/checkout@v4
-        with:
-          repository: libffi/libffi
-          ref: ${{ env.LIBFFI_REF }}
-          path: libffi
-          fetch-depth: 1
-
       - name: Ferramentas
         run: |
           sudo apt-get update
-          sudo apt-get install -y ant libx11-dev autoconf automake libtool texinfo zip
+          sudo apt-get install -y ant libx11-dev zip
 
       - name: Java 25
         uses: actions/setup-java@v4
@@ -79,11 +72,15 @@ jobs:
           ln -sfn "$NDK" "$ANDROID_SDK_ROOT/ndk-bundle"
           echo "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
 
+      # O pacote do release já traz o configure gerado (gerar do git exige um libtool mais novo que o do runner)
       - name: libffi (estático, aarch64-linux-android)
-        working-directory: libffi
         run: |
+          wget -nv "https://github.com/libffi/libffi/releases/download/v${LIBFFI_VERSAO}/libffi-${LIBFFI_VERSAO}.tar.gz"
+          echo "${LIBFFI_SHA256}  libffi-${LIBFFI_VERSAO}.tar.gz" | sha256sum -c -
+          tar xf "libffi-${LIBFFI_VERSAO}.tar.gz"
+          mv "libffi-${LIBFFI_VERSAO}" libffi
+          cd libffi
           TC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          ./autogen.sh
           ./configure --host=aarch64-linux-android --disable-shared --enable-static --with-pic --disable-docs \
             --disable-multi-os-directory \
             CC="$TC/aarch64-linux-android${API}-clang" AR="$TC/llvm-ar" RANLIB="$TC/llvm-ranlib" CFLAGS="-O2 -fPIC"
@@ -141,7 +138,7 @@ jobs:
           cat > saida/ORIGEM.txt <<EOF
           LWJGL ${LWJGL_VERSAO} (https://github.com/LWJGL/lwjgl3, tag ${LWJGL_VERSAO})
           Configuração Android: https://github.com/${CONFIG_REPO} @ ${CONFIG_REF}
-          libffi: https://github.com/libffi/libffi @ ${LIBFFI_REF} (estático, dentro do liblwjgl.so)
+          libffi ${LIBFFI_VERSAO} (https://github.com/libffi/libffi/releases/tag/v${LIBFFI_VERSAO}, sha256 ${LIBFFI_SHA256}; estático, dentro do liblwjgl.so)
           NDK ${NDK_VERSAO}, API ${API}, alinhamento de 16 KB
           Build: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
           EOF
