@@ -119,5 +119,10 @@ Formato: data, decisão, motivo, status. Não apagar entradas antigas: marcar co
 - Resultado (2026-11-26): releases `deps-lwjgl-3.4.3-1` (zip 1,3 MB; todas as bibliotecas com LOAD em 0x4000) e `deps-jre-25.0.5-1` (JRE 48,8 MB, código-fonte 147 MB; JAVA_VERSION 25.0.5, GNU_HASH presente, nada em 4 KB). Build do JRE: ~25 min no runner. O APK 0.6.1 já usa os dois
 - Status: aceita, em uso desde 0.6.1
 
+## 2026-11-26: APK de release gerado no PC
+- Decisão: o APK de release é gerado e publicado deste PC (`scripts/publicar-versao.sh`), não pelo GitHub Actions. A chave de assinatura não vai para os secrets do GitHub
+- Motivo: a chave nunca sai da máquina do Michel; o custo é um passo manual por versão. Escolha do Michel
+- Status: aceita
+
 ## Em aberto
 - Shaders: conversão em runtime ou pré-conversão no build

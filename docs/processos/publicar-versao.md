@@ -12,10 +12,14 @@ O atualizador do launcher (`Atualizacao.kt`) lê os Releases do repositório pú
 
 ## Passos
 
-1. `android/app/build.gradle.kts`: subir `versionCode` e `versionName`
-2. Patches aplicados e jogo compilado: `scripts/aplicar-patches.sh` e `cd upstream && ./gradlew build`
-3. `cd android && .\gradlew.bat assembleRelease` (com `android/assinatura.properties`)
-4. GitHub > Releases > Draft a new release: tag `vX.Y.Z`, título, notas; anexar `app/build/outputs/apk/release/app-release.apk` (renomear para `severed-chains-android-X.Y.Z.apk`); marcar *pre-release* se for do canal Teste
-5. Conferir no aparelho: launcher > Verificar
+O APK de release é gerado neste PC (a chave não vai para o GitHub; decisão em docs/context/04-decisoes.md).
 
-Quando o CI existir, os passos 2 a 4 viram um workflow disparado pela tag.
+1. `android/app/build.gradle.kts`: subir `versionCode` e `versionName`; commit e push
+2. Git Bash na raiz do repositório:
+   ```bash
+   scripts/publicar-versao.sh            # canal Estável
+   scripts/publicar-versao.sh --teste    # canal Teste (pre-release)
+   scripts/publicar-versao.sh --teste --notas notas.md
+   ```
+   O script confere que está tudo commitado e enviado e que a tag ainda não existe; aplica os patches, compila o jogo e o APK de release; confere que o APK está assinado com a chave do projeto (SHA-256 do certificado); copia para `dist/severed-chains-android-X.Y.Z.apk` e cria o release `vX.Y.Z` com o APK anexado
+3. Conferir no aparelho: launcher > Verificar
