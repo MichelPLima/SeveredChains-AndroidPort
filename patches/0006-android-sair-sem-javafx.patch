@@ -1,0 +1,46 @@
+From 0db378de5f5b331d5f600721c5836ed0fa7de587 Mon Sep 17 00:00:00 2001
+From: MichelPLima <109321208+MichelPLima@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 10:29:33 -0300
+Subject: [PATCH 6/6] Android: sair sem chamar o JavaFX
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+O onClose chamava javafx.application.Platform.exit(). O JavaFX não vai no
+APK, então o Voltar terminava em NoClassDefFoundError, "Crash detected",
+recovery save e System.exit (com FORTIFY do bionic na saída). No Android o
+Platform.exit() é pulado.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/main/java/legend/game/Scus94491BpeSegment.java | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/src/main/java/legend/game/Scus94491BpeSegment.java b/src/main/java/legend/game/Scus94491BpeSegment.java
+index 06fb3deff..98d116656 100644
+--- a/src/main/java/legend/game/Scus94491BpeSegment.java
++++ b/src/main/java/legend/game/Scus94491BpeSegment.java
+@@ -7,6 +7,7 @@ import legend.core.gpu.Rect4i;
+ import legend.core.gte.ModelPart10;
+ import legend.core.memory.Method;
+ import legend.core.memory.types.IntRef;
++import legend.core.platform.AndroidPlatformManager;
+ import legend.core.platform.input.InputKey;
+ import legend.core.platform.input.InputMod;
+ import legend.game.combat.Battle;
+@@ -213,7 +214,11 @@ public final class Scus94491BpeSegment {
+     RENDERER.events().onClose(() -> {
+       stopSound();
+       AUDIO_THREAD.stop();
+-      Platform.exit();
++
++      // JavaFX isn't shipped on Android (Android port); referencing Platform there throws NoClassDefFoundError
++      if(!(PLATFORM instanceof AndroidPlatformManager)) {
++        Platform.exit();
++      }
+     });
+   }
+ 
+-- 
+2.56.1.windows.1
+

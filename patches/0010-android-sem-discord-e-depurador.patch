@@ -1,0 +1,64 @@
+From e7b476558f045fe2ce446c2304d617cc75b3759b Mon Sep 17 00:00:00 2001
+From: MichelPLima <109321208+MichelPLima@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 12:03:06 -0300
+Subject: [PATCH 10/10] Android: sem Discord e sem o depurador JavaFX
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- O Discord Rich Presence não é iniciado no Android (não há cliente do
+  Discord no aparelho; o SDK só registrava uma falha com pilha no log)
+- A ação "Debug: open debugger" (F12 no PC, remapeável no controle) é
+  ignorada no Android: o depurador é JavaFX, que não vai no APK, e abri-lo
+  derrubava o jogo com NoClassDefFoundError
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/main/java/legend/core/GameEngine.java            | 6 +++++-
+ src/main/java/legend/core/renderer/RenderEngine.java | 6 +++++-
+ 2 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/src/main/java/legend/core/GameEngine.java b/src/main/java/legend/core/GameEngine.java
+index 55b3cc68d..4926380d4 100644
+--- a/src/main/java/legend/core/GameEngine.java
++++ b/src/main/java/legend/core/GameEngine.java
+@@ -261,7 +261,11 @@ public final class GameEngine {
+     RENDERER.events().onClose(Async::shutdown);
+     RENDERER.window().setWindowIcon(Path.of("gfx/textures/icon.png"));
+     GPU.init();
+-    DISCORD.init();
++
++    // Android port: there's no Discord client on the device (the Discord SDK only logged a failure)
++    if(!AndroidPort.isAndroid()) {
++      DISCORD.init();
++    }
+     openalThread.start();
+ 
+     time = System.nanoTime();
+diff --git a/src/main/java/legend/core/renderer/RenderEngine.java b/src/main/java/legend/core/renderer/RenderEngine.java
+index aaf607e14..6b64b9dfd 100644
+--- a/src/main/java/legend/core/renderer/RenderEngine.java
++++ b/src/main/java/legend/core/renderer/RenderEngine.java
+@@ -10,6 +10,7 @@ import legend.core.Version;
+ import legend.core.gpu.Bpp;
+ import legend.core.gte.MV;
+ import legend.core.lang.RawText;
++import legend.core.platform.AndroidPort;
+ import legend.core.platform.Window;
+ import legend.core.platform.WindowEvents;
+ import legend.core.platform.input.InputAction;
+@@ -1402,7 +1403,10 @@ public class RenderEngine {
+     }
+ 
+     if(action == INPUT_ACTION_DEBUG_OPEN_DEBUGGER.get()) {
+-      if(!Debugger.isRunning()) {
++      // Android port: the debugger is JavaFX, which isn't shipped on Android (referencing it would crash the game)
++      if(AndroidPort.isAndroid()) {
++        LOGGER.info("The debugger isn't available on Android");
++      } else if(!Debugger.isRunning()) {
+         try {
+           Platform.setImplicitExit(false);
+           new Thread(() -> Application.launch(Debugger.class)).start();
+-- 
+2.56.1.windows.1
+

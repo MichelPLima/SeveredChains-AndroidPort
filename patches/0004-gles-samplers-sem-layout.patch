@@ -1,0 +1,87 @@
+From 97cc00a14d6a240dfc23242155219cf767ee3078 Mon Sep 17 00:00:00 2001
+From: MichelPLima <109321208+MichelPLima@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 10:21:48 -0300
+Subject: [PATCH 4/6] GLES: samplers sem layout(location/binding) no GLSL ES
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+O shaderc atribui location e binding a todo uniform para gerar o SPIR-V, e
+o ShaderManager já removia os de uniforms comuns e de UBOs. Os samplers
+ficavam com layout(location = N, binding = M), que os fontes GL 3.3 não
+têm: no GLES o jogo dependia de localizações explícitas de uniform (ES 3.1+)
+e de o glUniform1i sobrescrever o binding. Agora os samplers também saem sem
+layout e são ligados só pelo glUniform1i, como no PC.
+-Dsc.gles.samplerLayout=keep volta ao comportamento anterior.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../legend/core/renderer/ShaderManager.java   | 29 +++++++++++++++++--
+ 1 file changed, 27 insertions(+), 2 deletions(-)
+
+diff --git a/src/main/java/legend/core/renderer/ShaderManager.java b/src/main/java/legend/core/renderer/ShaderManager.java
+index 74277b0c5..3f7b3c21f 100644
+--- a/src/main/java/legend/core/renderer/ShaderManager.java
++++ b/src/main/java/legend/core/renderer/ShaderManager.java
+@@ -37,6 +37,7 @@ import static org.lwjgl.util.spvc.Spvc.SPVC_CAPTURE_MODE_TAKE_OWNERSHIP;
+ import static org.lwjgl.util.spvc.Spvc.SPVC_COMPILER_OPTION_GLSL_ES;
+ import static org.lwjgl.util.spvc.Spvc.SPVC_COMPILER_OPTION_GLSL_VERSION;
+ import static org.lwjgl.util.spvc.Spvc.SPVC_RESOURCE_TYPE_GL_PLAIN_UNIFORM;
++import static org.lwjgl.util.spvc.Spvc.SPVC_RESOURCE_TYPE_SAMPLED_IMAGE;
+ import static org.lwjgl.util.spvc.Spvc.SPVC_RESOURCE_TYPE_UNIFORM_BUFFER;
+ import static org.lwjgl.util.spvc.Spvc.spvc_compiler_compile;
+ import static org.lwjgl.util.spvc.Spvc.spvc_compiler_create_compiler_options;
+@@ -56,9 +57,24 @@ public final class ShaderManager {
+   private static final Map<ShaderType, Shader> shaders = new HashMap<>();
+   private static final Map<String, ShaderUniformBuffer> uniformBuffers = new HashMap<>();
+ 
++  /**
++   * shaderc gives every sampler a location and a binding too, and spvc writes them out as {@code layout(location = N, binding = M)}.
++   * The GL 3.3 sources have neither, so by default they are removed and samplers are bound only by glUniform1i, like on desktop.
++   * {@code -Dsc.gles.samplerLayout=keep} restores the old behaviour.
++   */
++  private static final boolean STRIP_SAMPLER_LAYOUT = !"keep".equalsIgnoreCase(System.getProperty("sc.gles.samplerLayout"));
++
++  public static boolean stripsSamplerLayout() {
++    return STRIP_SAMPLER_LAYOUT;
++  }
++
+   public static String transpileShader(final String source, final ShaderStage shaderStage, final IntRef uniformIndex) {
++    return transpileShader(source, shaderStage, uniformIndex, STRIP_SAMPLER_LAYOUT);
++  }
++
++  public static String transpileShader(final String source, final ShaderStage shaderStage, final IntRef uniformIndex, final boolean stripSamplerLayout) {
+     final ByteBuffer spirv = compileShaderToSpirv(source, shaderStage);
+-    return decompileSpirvToGles(spirv, uniformIndex);
++    return decompileSpirvToGles(spirv, uniformIndex, stripSamplerLayout);
+   }
+ 
+   private static ByteBuffer compileShaderToSpirv(final String source, final ShaderStage shaderStage) {
+@@ -92,7 +108,7 @@ public final class ShaderManager {
+     return copy;
+   }
+ 
+-  private static String decompileSpirvToGles(final ByteBuffer spirvBuffer, final IntRef uniformIndex) {
++  private static String decompileSpirvToGles(final ByteBuffer spirvBuffer, final IntRef uniformIndex, final boolean stripSamplerLayout) {
+     try(final MemoryStack stack = MemoryStack.stackPush()) {
+       final IntBuffer spirvInts = spirvBuffer.asIntBuffer();
+ 
+@@ -138,6 +154,15 @@ public final class ShaderManager {
+       removeBindings(compiler, uniformList, uniformCount, SpvDecorationLocation, uniformIndex);
+       removeBindings(compiler, bufferList, bufferCount, SpvDecorationBinding, uniformIndex);
+ 
++      if(stripSamplerLayout) {
++        spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SAMPLED_IMAGE, resourceListBuffer, resourceCountBuffer);
++        final long samplerList = resourceListBuffer.get(0);
++        final long samplerCount = resourceCountBuffer.get(0);
++
++        removeBindings(compiler, samplerList, samplerCount, SpvDecorationLocation, uniformIndex);
++        removeBindings(compiler, samplerList, samplerCount, SpvDecorationBinding, uniformIndex);
++      }
++
+       // convert to gles
+       final PointerBuffer sourceBuffer = stack.mallocPointer(1);
+       spvc_compiler_compile(compiler, sourceBuffer);
+-- 
+2.56.1.windows.1
+

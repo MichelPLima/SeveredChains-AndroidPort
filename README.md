@@ -1,32 +1,35 @@
-# SeveredChains-Android
+# Severed Chains for Android
 
-Fork/port do [Severed Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains) (engine Java reconstruída de The Legend of Dragoon) para Android ARM64, no mesmo modelo do FF7Recomp e do FF9Recomp: o APK leva só o código do projeto, e o jogador fornece os próprios ISOs.
+Unofficial Android port of [Severed Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains), the open-source engine that runs The Legend of Dragoon on modern systems. The app contains no game data: you import the four discs of your own copy.
 
-Status: **Fase 0, setup.** Veja [docs/context/05-roadmap.md](docs/context/05-roadmap.md).
+This port is made with the help of AI (Claude Code). It is not affiliated with the Severed Chains team or with Sony. **Please report problems in this repository's [Issues](../../issues), not to the Severed Chains team.**
 
-## Estrutura
+**Status:** in testing, no public release yet. Tested on an AYN Odin 2 Portal (Snapdragon 8 Gen 2, Android 13): title screen, field, battles and cutscenes run.
 
-```
-docs/
-  context/     O que é o projeto, o que o upstream usa, arquitetura, decisões, roadmap
-  ai/          Instruções e estado atual para quem continuar com IA (Claude Code etc.)
-  processos/   Como fazer build, testar e conduzir Análise de Causa
-upstream/      Submódulo git do Severed Chains (não editar direto)
-patches/       Alterações sobre o upstream, em forma de patch
-android/       Projeto Gradle do app Android (launcher + runtime)
-natives/       Scripts/receitas para compilar JRE e natives LWJGL para android-arm64
-prototipo/     Provas de conceito descartáveis (ex.: Termux/proot)
-scripts/       Utilitários (setup, aplicar patches, build)
-```
+## Installing
 
-## Primeiros passos
+1. Download the APK from [Releases](../../releases) and install it (Android asks to allow installing from that source).
+2. In the launcher, tap **Import discs** and select the `.bin` files of the 4 discs of the US version (SCUS-94491, SCUS-94584, SCUS-94585, SCUS-94586). `.cue`, `.chd`, `.pbp` and 2048-byte `.iso` files are not supported. The originals are not changed; the app keeps a copy (about 2.3 GB).
+3. Tap **Play**. The first time, the game extracts its files from the discs.
 
-1. `scripts/setup.sh` (adiciona o upstream como submódulo)
-2. Leia `docs/context/` na ordem numérica
-3. Siga a Fase 0 do roadmap
+The launcher checks this repository's Releases for updates (channel **Stable**, or **Testing** for pre-releases) and installs them after you confirm. The launcher is in English, Portuguese and Spanish; the game itself uses Severed Chains' languages.
 
-## Licença e conteúdo
+Requirements: Android 9 or newer, arm64, OpenGL ES 3.2, and several GB of free space. A controller is recommended.
 
-- O código derivado do Severed Chains é **AGPL-3.0**. O fork precisa ser público, incluindo todas as modificações.
-- Este repositório e o APK **não incluem** nenhum dado do jogo. O usuário importa os 4 discos (ISOs) da própria cópia.
-- Não usar nome, logo nem arte da Sony/The Legend of Dragoon no app (ícone e nome próprios).
+## How it works
+
+- Severed Chains is written in Java. The app carries a Java 25 runtime (HotSpot) and runs the game in a separate process, drawing with OpenGL ES 3.2 through LWJGL.
+- Changes to Severed Chains are kept as patches in [`patches/`](patches), applied over the `upstream` submodule (Severed Chains commit `edcf232`).
+- Building: [`android/README.md`](android/README.md). Development notes are in Portuguese, in [`docs/`](docs).
+
+## Credits and license
+
+- Severed Chains: Monoxide and contributors, AGPL-3.0.
+- This port: AGPL-3.0 ([LICENSE](LICENSE)). Every third-party component in the APK, with its license text, is listed in the app (launcher > Credits).
+- The Legend of Dragoon © Sony Interactive Entertainment.
+
+---
+
+## Português
+
+Port não oficial do [Severed Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains) para Android, feito com ajuda de IA (Claude Code), sem vínculo com a equipe do Severed Chains nem com a Sony. O app não traz dados do jogo: você importa os 4 discos (`.bin` da versão americana) da sua própria cópia. Problemas: abra uma [Issue](../../issues) aqui, não com a equipe do Severed Chains. Instruções de build e documentação de desenvolvimento em [`docs/`](docs) e [`android/README.md`](android/README.md).

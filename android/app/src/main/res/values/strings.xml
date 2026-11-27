@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textos do app em inglês: padrão para qualquer idioma sem tradução (values-pt = português do Brasil, values-es = espanhol) -->
+<resources>
+    <!-- Launcher -->
+    <string name="subtitulo">ANDROID PORT</string>
+    <string name="salvar_log">Save log</string>
+    <string name="diagnostico">Diagnostics</string>
+    <string name="idioma">Language</string>
+    <string name="discos_titulo">DISCS</string>
+    <string name="discos_contagem">%1$d of %2$d</string>
+    <string name="importar_discos">Import discs</string>
+    <string name="jogar">Play</string>
+    <string name="msg_sessao_com_erro">The last game session closed with an error. Tap Save log and send the file for analysis.</string>
+    <string name="msg_importar">Tap Import discs and choose the .bin files of the 4 discs of the US version. You can select several at once; the originals are not changed.</string>
+    <string name="msg_primeira_extracao">All set. The first time, the game extracts the files from the discs before the title screen (this may take a few minutes).</string>
+    <string name="msg_pronto">All set. Enjoy the game!</string>
+    <string name="msg_conferindo">Checking %s…</string>
+    <string name="msg_copiando_disco">Copying disc %d…</string>
+    <string name="msg_erro_inesperado">Unexpected error: %s</string>
+    <plurals name="msg_discos_importados">
+        <item quantity="one">%d disc imported.</item>
+        <item quantity="other">%d discs imported.</item>
+    </plurals>
+    <string name="msg_todos_prontos">All discs ready.</string>
+    <string name="msg_nenhum_novo">No new discs.</string>
+
+    <!-- Linha de cada disco -->
+    <string name="disco_n">Disc %d</string>
+    <string name="disco_pronto">Ready · %d MB</string>
+    <string name="disco_faltando">Missing</string>
+    <string name="disco_copiando">Copying · %d MB</string>
+    <string name="disco_copiando_de">Copying · %1$d of %2$d MB</string>
+    <string name="discos_resumo">Discs</string>
+
+    <!-- Motivos para recusar um arquivo na importação -->
+    <string name="recusa_seletor">the file picker couldn\'t open the file</string>
+    <string name="recusa_leitura">failed to read or write (%s)</string>
+    <string name="recusa_espaco">not enough space for disc %1$d (needs %2$d MB, %3$d MB free)</string>
+    <string name="recusa_incompleta">incomplete copy (%1$d of %2$d bytes), discarded</string>
+    <string name="recusa_gravar">couldn\'t write %s</string>
+    <string name="recusa_pbp">it\'s a .pbp (PSP EBOOT): the game needs the .bin</string>
+    <string name="recusa_chd">it\'s a .chd (compressed): the game needs the .bin (chdman extractcd produces .cue + .bin)</string>
+    <string name="recusa_iso">it\'s a .iso with 2048 bytes per sector: the game needs the raw .bin (2352 bytes per sector)</string>
+    <string name="recusa_pequeno">too small for a disc (%d bytes; a .cue? choose the .bin)</string>
+    <string name="recusa_nao_bin">not a CD .bin (2352 bytes per sector)</string>
+    <string name="recusa_nao_playstation">not a PlayStation disc (system \"%s\")</string>
+    <string name="recusa_outro_disco">not an NTSC-U Legend of Dragoon disc (ID \"%s\"; the game only accepts SCUS94491, SCUS94584, SCUS94585 and SCUS94586)</string>
+
+    <!-- Abrir o jogo -->
+    <string name="abrindo">Opening…</string>
+    <string name="preparando_java">Preparing Java (first time only)…</string>
+    <string name="erro_java">Error preparing Java. Save the log for analysis.</string>
+
+    <!-- Salvar log -->
+    <string name="log_salvo">Log saved</string>
+    <string name="falha_salvar">Failed to save: %s</string>
+
+    <!-- Sair do jogo (Voltar) -->
+    <string name="sair_titulo">QUIT GAME?</string>
+    <string name="sair_texto">Progress since your last save will be lost.</string>
+    <string name="sair_continuar">Keep playing</string>
+    <string name="sair_confirmar">Quit</string>
+
+    <!-- Créditos e licenças -->
+    <string name="creditos">Credits</string>
+    <string name="creditos_titulo">CREDITS AND LICENSES</string>
+    <string name="creditos_intro">Severed Chains for Android is an unofficial port of Severed Chains, made with the help of AI. It is not affiliated with the Severed Chains team or with Sony. The game data comes from your own discs.</string>
+    <string name="creditos_e_colaboradores">%s and contributors</string>
+    <string name="creditos_licenca">License: %s</string>
+    <string name="creditos_ver_licenca">License</string>
+    <string name="creditos_site">Website</string>
+    <string name="creditos_codigo">Source code</string>
+    <string name="creditos_port_nome">Severed Chains for Android</string>
+    <string name="creditos_port_descricao">Modified in 2026 from Severed Chains 3.0.0 (commit %s). The changes are in the patches folder of the source code.</string>
+    <string name="creditos_lod_descricao">The game data comes from your own discs. This project is not affiliated with Sony.</string>
+    <string name="creditos_build_android">Android build: %s</string>
+    <string name="creditos_ffmpeg_descricao">Plays the opening video. FFmpeg built without GPL parts, with OpenSSL (Apache-2.0).</string>
+    <string name="creditos_java_nome">Java libraries used by the game</string>
+    <string name="creditos_java_descricao">log4j, JOML, fastutil, ANTLR, Apache Commons, JavaCV and others, each under its own license (Apache-2.0, MIT, BSD…). List in the Severed Chains build file.</string>
+    <string name="creditos_java_nao_instalado">This license comes with Java, which is installed the first time the game opens.</string>
+
+    <!-- Atualizações -->
+    <string name="atualizacao_versao">Version %s</string>
+    <string name="atualizacao_canal">Channel: %s</string>
+    <string name="canal_estavel">Stable</string>
+    <string name="canal_teste">Testing</string>
+    <string name="atualizacao_verificar">Check</string>
+    <string name="atualizacao_atualizar">Update</string>
+    <string name="atualizacao_verificando">checking for updates…</string>
+    <string name="atualizacao_em_dia">up to date</string>
+    <string name="atualizacao_disponivel">version %s available</string>
+    <string name="atualizacao_baixando">downloading %1$s… %2$d%%</string>
+    <string name="atualizacao_confirmar">confirm the installation in the Android window</string>
+    <string name="atualizacao_instalada">update installed</string>
+    <string name="atualizacao_sem_conexao">could not check (no connection?)</string>
+    <string name="atualizacao_permitir">allow installing updates from this app, then tap Update again</string>
+    <string name="atualizacao_falhou">update failed: %s</string>
+    <string name="atualizacao_hash">the download does not match the published file</string>
+
+    <!-- Idioma -->
+    <string name="idioma_titulo">LANGUAGE</string>
+    <string name="idioma_sistema">System language</string>
+
+    <!-- Diagnóstico e testes -->
+    <string name="diag_m3a">M3a: Libraries</string>
+    <string name="diag_m2">M2: Screen (GLES)</string>
+    <string name="diag_m1">M1: JVM</string>
+    <string name="diag_jogo">Game (skip disc check)</string>
+    <string name="diag_gles_ligado">GLES diagnostics: on</string>
+    <string name="diag_gles_desligado">GLES diagnostics: off</string>
+    <string name="diag_gles_ajuda">GLES diagnostics writes the graphics driver messages to the log (and shows the serious ones on screen); it applies the next time the game opens.</string>
+    <string name="diag_limpar_log">Clear log</string>
+    <string name="voltar">Back</string>
+    <string name="diag_status">%s. Tests open in full screen; Back closes each one.</string>
+    <string name="m1_titulo">HotSpot 25 · :jvm process</string>
+    <string name="fechar">Close</string>
+    <string name="m1_iniciando">Starting the JVM…</string>
+    <string name="m1_ja_rodou">The JVM already ran in this process. Close and start again from the main screen.</string>
+    <string name="m1_falha_iniciar">Failed to start: %s</string>
+    <string name="m1_rodando">JVM running…</string>
+    <string name="m1_terminou">The JVM finished normally. Check the result in the log.</string>
+    <string name="m1_terminou_erro">The JVM finished with an error (code %d).</string>
+    <string name="m1_falha">Failure: %s</string>
+    <string name="jvm_erro_log">couldn\'t open the log file</string>
+    <string name="jvm_erro_dlopen">dlopen of libjvm.so failed (see log)</string>
+    <string name="jvm_erro_simbolo">JNI_CreateJavaVM not found in libjvm.so</string>
+    <string name="jvm_erro_criar">JNI_CreateJavaVM failed (see log)</string>
+    <string name="jvm_erro_classe">exception or main class not found (see log)</string>
+    <string name="jvm_erro_thread">couldn\'t create the JVM thread</string>
+    <string name="jvm_erro_ja_iniciada">the JVM was already started in this process</string>
+    <string name="jvm_erro_codigo">error %d</string>
+</resources>

@@ -20,6 +20,7 @@
 #include <android/native_window_jni.h>
 #include <pthread.h>
 #include <stdatomic.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -213,12 +214,34 @@ Java_legend_core_platform_AndroidBridge_createContext(JNIEnv *env, jclass clazz)
     return JNI_FALSE;
   }
 
+  // Contexto de debug, como o upstream pede no PC (SDL_GL_CONTEXT_DEBUG_FLAG), só com o diagnóstico GLES ligado
+  // (SC_GL_DEBUG=1, definido pelo Jvm.kt a partir da chave da tela Diagnóstico): o GlesApi liga o callback de
+  // mensagens do driver quando vê GL_CONTEXT_FLAG_DEBUG_BIT. EGL_CONTEXT_OPENGL_DEBUG é do EGL 1.5; se o driver
+  // recusar, cai para o contexto comum.
+  const char *pedirDebug = getenv("SC_GL_DEBUG");
+  const EGLint atribCtxDebug[] = {
+    EGL_CONTEXT_MAJOR_VERSION, 3,
+    EGL_CONTEXT_MINOR_VERSION, 2,
+    EGL_CONTEXT_OPENGL_DEBUG, EGL_TRUE,
+    EGL_NONE,
+  };
   const EGLint atribCtx[] = {
     EGL_CONTEXT_MAJOR_VERSION, 3,
     EGL_CONTEXT_MINOR_VERSION, 2,
     EGL_NONE,
   };
-  ctx = eglCreateContext(dpy, cfg, EGL_NO_CONTEXT, atribCtx);
+  ctx = EGL_NO_CONTEXT;
+  if(pedirDebug != NULL && strcmp(pedirDebug, "1") == 0 && (maior > 1 || (maior == 1 && menor >= 5))) {
+    ctx = eglCreateContext(dpy, cfg, EGL_NO_CONTEXT, atribCtxDebug);
+    if(ctx == EGL_NO_CONTEXT) {
+      LOGI("contexto GLES 3.2 de debug recusado (0x%x), usando o comum", eglGetError());
+    } else {
+      LOGI("contexto GLES 3.2 de debug");
+    }
+  }
+  if(ctx == EGL_NO_CONTEXT) {
+    ctx = eglCreateContext(dpy, cfg, EGL_NO_CONTEXT, atribCtx);
+  }
   if(ctx == EGL_NO_CONTEXT) {
     LOGE("eglCreateContext 3.2: 0x%x", eglGetError());
     return JNI_FALSE;
@@ -341,4 +364,43 @@ Java_legend_core_platform_AndroidBridge_nextEvent(JNIEnv *env, jclass clazz, jin
   (*env)->SetIntArrayRegion(env, ints, 0, 2, iv);
   (*env)->SetFloatArrayRegion(env, floats, 0, 2, fv);
   return e.tipo;
+}
+
+/* ---------- links (o jogo pede, o app abre no navegador) ---------- */
+
+static char urlPendente[2048];
+static int temUrl = 0; /* protegidos por mutex */
+
+/** HotSpot: AndroidPlatformManager.openUrl (tela About do jogo). Guarda o último pedido; o app busca com proximaUrl. */
+JNIEXPORT void JNICALL
+Java_legend_core_platform_AndroidBridge_openUrl(JNIEnv *env, jclass clazz, jstring url) {
+  (void)clazz;
+  if(url == NULL) {
+    return;
+  }
+  const char *s = (*env)->GetStringUTFChars(env, url, NULL);
+  if(s == NULL) {
+    return;
+  }
+  pthread_mutex_lock(&mutex);
+  strncpy(urlPendente, s, sizeof(urlPendente) - 1);
+  urlPendente[sizeof(urlPendente) - 1] = '\0';
+  temUrl = 1;
+  pthread_mutex_unlock(&mutex);
+  (*env)->ReleaseStringUTFChars(env, url, s);
+}
+
+/** ART: o link pedido pelo jogo (e o esquece), ou null. A TelaActivity consulta enquanto o jogo está na frente. */
+JNIEXPORT jstring JNICALL
+Java_io_github_michelplima_severedchains_Native_proximaUrl(JNIEnv *env, jclass clazz) {
+  (void)clazz;
+  char copia[sizeof(urlPendente)];
+  pthread_mutex_lock(&mutex);
+  const int tem = temUrl;
+  if(tem) {
+    memcpy(copia, urlPendente, sizeof(copia));
+    temUrl = 0;
+  }
+  pthread_mutex_unlock(&mutex);
+  return tem ? (*env)->NewStringUTF(env, copia) : NULL;
 }

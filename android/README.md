@@ -14,6 +14,11 @@ android/
       AndroidManifest.xml                  sem permissões; JvmActivity no processo ":jvm"
       kotlin/.../MainActivity.kt           launcher: logo, janela dos discos (importar, progresso), Jogar
       kotlin/.../Visual.kt                 identidade visual: paleta, janelas no estilo do jogo, botões com foco, logo
+      kotlin/.../Idioma.kt                 idioma das telas (segue o Android ou fixo: PT-BR, ES, EN) e janela de escolha
+      kotlin/.../CreditosActivity.kt       créditos e licenças (textos em assets/licencas), links de site e código-fonte
+      kotlin/.../Atualizacao.kt            atualizações: Releases do GitHub, canal Estável/Teste, PackageInstaller
+      kotlin/.../Projeto.kt                endereços do repositório público do port
+      res/values{,-pt,-es}/strings.xml     textos do app (inglês é o padrão); res/xml/locales_config.xml (Android 13+)
       kotlin/.../Discos.kt                 importação: seletor do Android, valida o PVD e copia para isos/discoN.bin
       kotlin/.../Abrir.kt                  prepara o runtime e abre uma tela do processo ":jvm"
       kotlin/.../DiagnosticoActivity.kt    testes M1/M2/M3a, log, "Jogo (sem checar discos)"

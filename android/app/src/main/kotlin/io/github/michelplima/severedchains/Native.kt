@@ -1,5 +1,6 @@
 package io.github.michelplima.severedchains
 
+import android.content.Context
 import android.view.Surface
 
 /** Ponte com libscjvm.so (src/main/cpp). Só usar no processo ":jvm". */
@@ -57,14 +58,18 @@ object Native {
     @JvmStatic
     external fun eventoToque(acao: Int, x: Float, y: Float)
 
-    fun descreverErro(estado: Int): String = when(estado) {
-        -1 -> "não consegui abrir o arquivo de log"
-        -2 -> "dlopen do libjvm.so falhou (ver log)"
-        -3 -> "JNI_CreateJavaVM não encontrado no libjvm.so"
-        -4 -> "JNI_CreateJavaVM falhou (ver log)"
-        -5 -> "exceção ou classe principal não encontrada (ver log)"
-        -6 -> "não consegui criar a thread da JVM"
-        -100 -> "a JVM já foi iniciada neste processo"
-        else -> "erro $estado"
+    /** Link que o jogo pediu para abrir (tela About), ou null. Consome o pedido. */
+    @JvmStatic
+    external fun proximaUrl(): String?
+
+    fun descreverErro(ctx: Context, estado: Int): String = when(estado) {
+        -1 -> ctx.getString(R.string.jvm_erro_log)
+        -2 -> ctx.getString(R.string.jvm_erro_dlopen)
+        -3 -> ctx.getString(R.string.jvm_erro_simbolo)
+        -4 -> ctx.getString(R.string.jvm_erro_criar)
+        -5 -> ctx.getString(R.string.jvm_erro_classe)
+        -6 -> ctx.getString(R.string.jvm_erro_thread)
+        -100 -> ctx.getString(R.string.jvm_erro_ja_iniciada)
+        else -> ctx.getString(R.string.jvm_erro_codigo, estado)
     }
 }

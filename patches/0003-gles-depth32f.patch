@@ -1,0 +1,43 @@
+From f1465d8a3deac92f326143a49bd4b3b6a013ba2b Mon Sep 17 00:00:00 2001
+From: MichelPLima <109321208+MichelPLima@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 10:21:18 -0300
+Subject: [PATCH 3/6] GLES: depth buffer em DEPTH_COMPONENT32F
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+O RenderEngine cria o depth buffer com DEPTH_COMPONENT + FLOAT. No GLES o
+formato sem tamanho (DEPTH_COMPONENT) só aceita UNSIGNED_SHORT/UNSIGNED_INT;
+com FLOAT o formato válido é DEPTH_COMPONENT32F. A Adreno aceitava a
+combinação inválida por conta própria, sem dizer qual precisão escolheu.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/main/java/legend/core/renderer/opengles/GlesTexture.java | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/main/java/legend/core/renderer/opengles/GlesTexture.java b/src/main/java/legend/core/renderer/opengles/GlesTexture.java
+index 8e7ce5470..2529e96ac 100644
+--- a/src/main/java/legend/core/renderer/opengles/GlesTexture.java
++++ b/src/main/java/legend/core/renderer/opengles/GlesTexture.java
+@@ -38,6 +38,7 @@ import static org.lwjgl.opengles.GLES20.glGenTextures;
+ import static org.lwjgl.opengles.GLES20.glTexImage2D;
+ import static org.lwjgl.opengles.GLES20.glTexParameteri;
+ import static org.lwjgl.opengles.GLES20.glTexSubImage2D;
++import static org.lwjgl.opengles.GLES30.GL_DEPTH_COMPONENT32F;
+ import static org.lwjgl.opengles.GLES30.GL_R32UI;
+ import static org.lwjgl.opengles.GLES30.GL_RED_INTEGER;
+ import static org.lwjgl.opengles.GLES30.GL_RGB8;
+@@ -98,7 +99,8 @@ public final class GlesTexture extends Texture {
+       case RGB_8 -> GL_RGB8;
+       case RGBA_8 -> GL_RGBA8;
+       case R_32_UINT -> GL_R32UI;
+-      case DEPTH_COMPONENT -> GL_DEPTH_COMPONENT;
++      // GLES only accepts the unsized DEPTH_COMPONENT with UNSIGNED_SHORT/UNSIGNED_INT; FLOAT data needs the sized DEPTH_COMPONENT32F
++      case DEPTH_COMPONENT -> dataType == TextureDataType.FLOAT ? GL_DEPTH_COMPONENT32F : GL_DEPTH_COMPONENT;
+     };
+ 
+     if(buffer != null) {
+-- 
+2.56.1.windows.1
+

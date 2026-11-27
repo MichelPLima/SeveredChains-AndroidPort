@@ -8,7 +8,7 @@ Regras:
 - Antes de mudar a arquitetura, registrar a decisão em docs/context/04-decisoes.md.
 - Ao terminar uma tarefa, atualizar docs/ai/estado-atual.md (feito, próximo passo, bloqueios).
 - Problemas: registrar seguindo docs/processos/analise-de-causa.md.
-- Aparelho de teste (AYN Odin 2 Portal) é a coleção pessoal de ROMs do Michel. Sem adb, por decisão dele:
+- Aparelho de teste (AYN Odin 2 Portal) é o aparelho pessoal do Michel. Sem adb, por decisão dele:
   - Tudo que vai para o aparelho (builds, APKs, ISOs) é copiado e instalado manualmente pelo Michel
   - A IA prepara os arquivos no PC (ex.: pasta dist/) e escreve os passos; os logs voltam colados pelo Michel
   - Não propor adb nem acesso remoto ao aparelho sem ele pedir

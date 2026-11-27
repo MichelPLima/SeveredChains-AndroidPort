@@ -102,9 +102,9 @@ object SalvarLog {
         val uri = data?.data ?: return
         try {
             activity.contentResolver.openOutputStream(uri)?.use { it.write(Logs.completo(activity).toByteArray()) }
-            Toast.makeText(activity, "Log salvo", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, activity.getString(R.string.log_salvo), Toast.LENGTH_SHORT).show()
         } catch(e: Exception) {
-            Toast.makeText(activity, "Falha ao salvar: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(activity, activity.getString(R.string.falha_salvar, e.message.toString()), Toast.LENGTH_LONG).show()
         }
     }
 }

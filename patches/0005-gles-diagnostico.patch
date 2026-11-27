@@ -1,0 +1,701 @@
+From ade283b334a68edc537e3dc55d7b38588eed52c8 Mon Sep 17 00:00:00 2001
+From: MichelPLima <109321208+MichelPLima@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 10:29:33 -0300
+Subject: [PATCH 5/6] =?UTF-8?q?GLES:=20diagn=C3=B3stico=20do=20renderer=20?=
+ =?UTF-8?q?(-Dsc.gles.diag=3Dtrue)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Classe nova GlesDiagnostics, ligada só com -Dsc.gles.diag=true:
+- mensagens de debug GL sem repetição (3 vezes cada, depois 1 a cada 1000);
+  com o diagnóstico ligado o debug output é ativado mesmo sem contexto de
+  debug (KHR_debug é core no GLES 3.2) e as mensagens MEDIUM também entram
+- glGetError ao fim de cada quadro
+- cada programa lista uniforms (localização, unidade dos samplers), blocos
+  e info log depois de ligado
+- os primeiros uploads de cada textura são lidos de volta da GPU e
+  comparados com os dados enviados
+- na inicialização, uma sonda desenha através de uma textura R32UI com
+  usampler2D/texelFetch e CLUT de 4bpp, como a VRAM do PS1 é lida nos
+  shaders, com e sem layout nos samplers
+
+Ganchos: GlesApi.init/unbindTexture, GlesShader.reload, GlesTexture.data.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../core/renderer/opengles/GlesApi.java       |  22 +-
+ .../renderer/opengles/GlesDiagnostics.java    | 569 ++++++++++++++++++
+ .../core/renderer/opengles/GlesShader.java    |   5 +
+ .../core/renderer/opengles/GlesTexture.java   |   4 +
+ 4 files changed, 598 insertions(+), 2 deletions(-)
+ create mode 100644 src/main/java/legend/core/renderer/opengles/GlesDiagnostics.java
+
+diff --git a/src/main/java/legend/core/renderer/opengles/GlesApi.java b/src/main/java/legend/core/renderer/opengles/GlesApi.java
+index 2183fdc33..878110a8b 100644
+--- a/src/main/java/legend/core/renderer/opengles/GlesApi.java
++++ b/src/main/java/legend/core/renderer/opengles/GlesApi.java
+@@ -129,7 +129,12 @@ public class GlesApi implements RenderApi {
+     final int[] flags = new int[1];
+     glGetIntegerv(GL30C.GL_CONTEXT_FLAGS, flags);
+ 
+-    if((flags[0] & GL_CONTEXT_FLAG_DEBUG_BIT) != 0) {
++    if(GlesDiagnostics.ENABLED) {
++      LOGGER.info("GLES diagnostics enabled, context flags 0x%x (debug context: %b)", flags[0], (flags[0] & GL_CONTEXT_FLAG_DEBUG_BIT) != 0);
++    }
++
++    // GLES 3.2 has KHR_debug in core, so the diagnostics turn debug output on even if the context isn't a debug context
++    if((flags[0] & GL_CONTEXT_FLAG_DEBUG_BIT) != 0 || GlesDiagnostics.ENABLED) {
+       this.debugEnabled = true;
+ 
+       glEnable(GL_DEBUG_OUTPUT);
+@@ -138,12 +143,16 @@ public class GlesApi implements RenderApi {
+       if(!"true".equalsIgnoreCase(System.getenv("opengl_debug"))) {
+         glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, new int[0], false);
+         glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW, new int[0], false);
+-        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_MEDIUM, new int[0], false);
++        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_MEDIUM, new int[0], GlesDiagnostics.ENABLED);
+       }
+ 
+       glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_HIGH, new int[0], true);
+ 
+       final GLDebugMessageCallback customCallbackRef = GLDebugMessageCallback.create((source, type, id, severity, length, message, userParam) -> {
++        if(GlesDiagnostics.ENABLED && !GlesDiagnostics.shouldLogMessage(id, GLDebugMessageCallback.getMessage(length, message))) {
++          return;
++        }
++
+         final String shaderName = this.getObjectName(GL_CURRENT_PROGRAM,  GL_PROGRAM);
+         final String textureName = this.getObjectName(GL_TEXTURE_BINDING_2D, GL_TEXTURE);
+         final String framebufferName = this.getObjectName(GL_FRAMEBUFFER_BINDING, GL_FRAMEBUFFER);
+@@ -177,6 +186,10 @@ public class GlesApi implements RenderApi {
+       // Attach it to the active driver instance
+       glDebugMessageCallback(customCallbackRef, 0L);
+     }
++
++    if(GlesDiagnostics.ENABLED) {
++      GlesDiagnostics.probeIntegerTextures();
++    }
+   }
+ 
+   private String getObjectName(final int bindingType, final int objectType) {
+@@ -285,6 +298,11 @@ public class GlesApi implements RenderApi {
+   @Override
+   public void unbindTexture() {
+     GlesTexture.unbind();
++
++    // Called once per frame by the render engine, after the final screen quad
++    if(GlesDiagnostics.ENABLED) {
++      GlesDiagnostics.endFrame();
++    }
+   }
+ 
+   @Override
+diff --git a/src/main/java/legend/core/renderer/opengles/GlesDiagnostics.java b/src/main/java/legend/core/renderer/opengles/GlesDiagnostics.java
+new file mode 100644
+index 000000000..90ea212a0
+--- /dev/null
++++ b/src/main/java/legend/core/renderer/opengles/GlesDiagnostics.java
+@@ -0,0 +1,569 @@
++package legend.core.renderer.opengles;
++
++import legend.core.memory.types.IntRef;
++import legend.core.renderer.ShaderManager;
++import legend.core.renderer.ShaderStage;
++import legend.core.renderer.TextureInternalFormat;
++import org.apache.logging.log4j.Level;
++import org.apache.logging.log4j.LogManager;
++import org.apache.logging.log4j.Logger;
++import org.lwjgl.system.MemoryStack;
++import org.lwjgl.system.MemoryUtil;
++
++import java.nio.ByteBuffer;
++import java.nio.IntBuffer;
++import java.util.HashMap;
++import java.util.Map;
++
++import static org.lwjgl.opengles.GLES20.glBindBuffer;
++import static org.lwjgl.opengles.GLES20.glBufferData;
++import static org.lwjgl.opengles.GLES20.glDeleteBuffers;
++import static org.lwjgl.opengles.GLES20.glGenBuffers;
++import static org.lwjgl.opengles.GLES20.GL_STATIC_DRAW;
++import static org.lwjgl.opengles.GLES30.GL_UNIFORM_BUFFER;
++import static org.lwjgl.opengles.GLES30.glBindBufferBase;
++import static org.lwjgl.opengles.GLES30.glGetUniformBlockIndex;
++import static org.lwjgl.opengles.GLES30.glUniformBlockBinding;
++import static org.lwjgl.opengles.GLES20.GL_BLEND;
++import static org.lwjgl.opengles.GLES20.GL_CLAMP_TO_EDGE;
++import static org.lwjgl.opengles.GLES20.GL_COLOR_ATTACHMENT0;
++import static org.lwjgl.opengles.GLES20.GL_COMPILE_STATUS;
++import static org.lwjgl.opengles.GLES20.GL_CULL_FACE;
++import static org.lwjgl.opengles.GLES20.GL_DEPTH_TEST;
++import static org.lwjgl.opengles.GLES20.GL_FRAGMENT_SHADER;
++import static org.lwjgl.opengles.GLES20.GL_FRAMEBUFFER;
++import static org.lwjgl.opengles.GLES20.GL_FRAMEBUFFER_BINDING;
++import static org.lwjgl.opengles.GLES20.GL_FRAMEBUFFER_COMPLETE;
++import static org.lwjgl.opengles.GLES20.GL_INVALID_ENUM;
++import static org.lwjgl.opengles.GLES20.GL_INVALID_FRAMEBUFFER_OPERATION;
++import static org.lwjgl.opengles.GLES20.GL_INVALID_OPERATION;
++import static org.lwjgl.opengles.GLES20.GL_INVALID_VALUE;
++import static org.lwjgl.opengles.GLES20.GL_LINK_STATUS;
++import static org.lwjgl.opengles.GLES20.GL_NEAREST;
++import static org.lwjgl.opengles.GLES20.GL_NO_ERROR;
++import static org.lwjgl.opengles.GLES20.GL_OUT_OF_MEMORY;
++import static org.lwjgl.opengles.GLES20.GL_RGBA;
++import static org.lwjgl.opengles.GLES20.GL_SAMPLER_2D;
++import static org.lwjgl.opengles.GLES20.GL_SCISSOR_TEST;
++import static org.lwjgl.opengles.GLES20.GL_TEXTURE0;
++import static org.lwjgl.opengles.GLES20.GL_TEXTURE1;
++import static org.lwjgl.opengles.GLES20.GL_TEXTURE2;
++import static org.lwjgl.opengles.GLES20.GL_TEXTURE_2D;
++import static org.lwjgl.opengles.GLES20.GL_TEXTURE_MAG_FILTER;
++import static org.lwjgl.opengles.GLES20.GL_TEXTURE_MIN_FILTER;
++import static org.lwjgl.opengles.GLES20.GL_TEXTURE_WRAP_S;
++import static org.lwjgl.opengles.GLES20.GL_TEXTURE_WRAP_T;
++import static org.lwjgl.opengles.GLES20.GL_TRIANGLES;
++import static org.lwjgl.opengles.GLES20.GL_UNSIGNED_BYTE;
++import static org.lwjgl.opengles.GLES20.GL_UNSIGNED_INT;
++import static org.lwjgl.opengles.GLES20.GL_VERTEX_SHADER;
++import static org.lwjgl.opengles.GLES20.GL_ACTIVE_UNIFORMS;
++import static org.lwjgl.opengles.GLES20.glActiveTexture;
++import static org.lwjgl.opengles.GLES20.glAttachShader;
++import static org.lwjgl.opengles.GLES20.glBindFramebuffer;
++import static org.lwjgl.opengles.GLES20.glBindTexture;
++import static org.lwjgl.opengles.GLES20.glCheckFramebufferStatus;
++import static org.lwjgl.opengles.GLES20.glCompileShader;
++import static org.lwjgl.opengles.GLES20.glCreateProgram;
++import static org.lwjgl.opengles.GLES20.glCreateShader;
++import static org.lwjgl.opengles.GLES20.glDeleteFramebuffers;
++import static org.lwjgl.opengles.GLES20.glDeleteProgram;
++import static org.lwjgl.opengles.GLES20.glDeleteShader;
++import static org.lwjgl.opengles.GLES20.glDeleteTextures;
++import static org.lwjgl.opengles.GLES20.glDisable;
++import static org.lwjgl.opengles.GLES20.glDrawArrays;
++import static org.lwjgl.opengles.GLES20.glFramebufferTexture2D;
++import static org.lwjgl.opengles.GLES20.glGenFramebuffers;
++import static org.lwjgl.opengles.GLES20.glGenTextures;
++import static org.lwjgl.opengles.GLES20.glGetActiveUniform;
++import static org.lwjgl.opengles.GLES20.glGetError;
++import static org.lwjgl.opengles.GLES20.glGetInteger;
++import static org.lwjgl.opengles.GLES20.glGetProgramInfoLog;
++import static org.lwjgl.opengles.GLES20.glGetProgrami;
++import static org.lwjgl.opengles.GLES20.glGetShaderInfoLog;
++import static org.lwjgl.opengles.GLES20.glGetShaderi;
++import static org.lwjgl.opengles.GLES20.glGetUniformLocation;
++import static org.lwjgl.opengles.GLES20.glGetUniformi;
++import static org.lwjgl.opengles.GLES20.glLinkProgram;
++import static org.lwjgl.opengles.GLES20.glReadPixels;
++import static org.lwjgl.opengles.GLES20.glShaderSource;
++import static org.lwjgl.opengles.GLES20.glTexImage2D;
++import static org.lwjgl.opengles.GLES20.glTexParameteri;
++import static org.lwjgl.opengles.GLES20.glTexSubImage2D;
++import static org.lwjgl.opengles.GLES20.glUniform1i;
++import static org.lwjgl.opengles.GLES20.glUseProgram;
++import static org.lwjgl.opengles.GLES20.glViewport;
++import static org.lwjgl.opengles.GLES30.GL_ACTIVE_UNIFORM_BLOCKS;
++import static org.lwjgl.opengles.GLES30.GL_INT_SAMPLER_2D;
++import static org.lwjgl.opengles.GLES30.GL_R32UI;
++import static org.lwjgl.opengles.GLES30.GL_RED_INTEGER;
++import static org.lwjgl.opengles.GLES30.GL_RGBA32UI;
++import static org.lwjgl.opengles.GLES30.GL_RGBA8;
++import static org.lwjgl.opengles.GLES30.GL_RGBA_INTEGER;
++import static org.lwjgl.opengles.GLES30.GL_UNIFORM_BLOCK_BINDING;
++import static org.lwjgl.opengles.GLES30.GL_UNIFORM_BLOCK_DATA_SIZE;
++import static org.lwjgl.opengles.GLES30.GL_UNSIGNED_INT_SAMPLER_2D;
++import static org.lwjgl.opengles.GLES30.glBindVertexArray;
++import static org.lwjgl.opengles.GLES30.glDeleteVertexArrays;
++import static org.lwjgl.opengles.GLES30.glGenVertexArrays;
++import static org.lwjgl.opengles.GLES30.glGetActiveUniformBlockName;
++import static org.lwjgl.opengles.GLES30.glGetActiveUniformBlocki;
++
++/**
++ * Diagnostics for the GLES renderer (Android port), enabled with {@code -Dsc.gles.diag=true}:
++ * <ul>
++ *   <li>GL debug messages are deduplicated: each distinct message is logged a few times, then only every 1000th repetition</li>
++ *   <li>glGetError sweep once per frame</li>
++ *   <li>after linking, every program logs its active uniforms (location, sampler unit), uniform blocks and info log</li>
++ *   <li>the first uploads of each texture are read back from the GPU and compared with the uploaded data</li>
++ *   <li>once at startup, a probe draws through an R32UI texture with usampler2D/texelFetch, the way the PS1 VRAM is sampled,
++ *       with and without sampler layout qualifiers</li>
++ * </ul>
++ */
++public final class GlesDiagnostics {
++  private static final Logger LOGGER = LogManager.getFormatterLogger(GlesDiagnostics.class);
++
++  public static final boolean ENABLED = Boolean.getBoolean("sc.gles.diag");
++
++  private static final int LOG_FIRST = 3;
++  private static final int PROBE_UBO_BINDING = 30;
++  private static final int CHECKS_PER_TEXTURE = 2;
++
++  private static final Map<String, Integer> messageCounts = new HashMap<>();
++  private static final Map<Integer, Integer> errorCounts = new HashMap<>();
++  private static final Map<String, Integer> uploadChecks = new HashMap<>();
++  private static long frame;
++
++  private GlesDiagnostics() { }
++
++  /** Whether a GL debug message should be logged: the first few times, then every 1000th repetition */
++  static boolean shouldLogMessage(final int id, final String message) {
++    final int count = messageCounts.merge(id + ":" + message, 1, Integer::sum);
++
++    if(count == LOG_FIRST + 1) {
++      LOGGER.warn("GL message %d logged %d times, from now on only every 1000th repetition is logged", id, LOG_FIRST);
++    }
++
++    if(count > LOG_FIRST && count % 1000 == 0) {
++      LOGGER.warn("GL message %d repeated %d times: %s", id, count, message);
++      return false;
++    }
++
++    return count <= LOG_FIRST;
++  }
++
++  /** Called once per frame (when the frame's textures are unbound): logs any GL error left in the error queue */
++  static void endFrame() {
++    frame++;
++
++    int error;
++    int guard = 0;
++    while((error = glGetError()) != GL_NO_ERROR && guard++ < 32) {
++      final int count = errorCounts.merge(error, 1, Integer::sum);
++
++      if(count <= 10 || count % 1000 == 0) {
++        LOGGER.error("glGetError 0x%04x (%s) at the end of frame %d (occurrence %d)", error, errorName(error), frame, count);
++      }
++    }
++  }
++
++  static String errorName(final int error) {
++    return switch(error) {
++      case GL_INVALID_ENUM -> "INVALID_ENUM";
++      case GL_INVALID_VALUE -> "INVALID_VALUE";
++      case GL_INVALID_OPERATION -> "INVALID_OPERATION";
++      case GL_INVALID_FRAMEBUFFER_OPERATION -> "INVALID_FRAMEBUFFER_OPERATION";
++      case GL_OUT_OF_MEMORY -> "OUT_OF_MEMORY";
++      default -> "?";
++    };
++  }
++
++  /** Logs the active uniforms (with location and, for samplers, the texture unit), the uniform blocks and the info log of a program */
++  static void dumpProgram(final String name, final int program) {
++    final StringBuilder sb = new StringBuilder();
++    sb.append("Program ").append(name).append(" (id ").append(program).append(", sampler layout ")
++      .append(ShaderManager.stripsSamplerLayout() ? "stripped" : "kept").append(')');
++
++    final String info = glGetProgramInfoLog(program).trim();
++    if(!info.isEmpty()) {
++      sb.append("\n  info log: ").append(info.replace("\n", "\n    "));
++    }
++
++    final Map<Integer, String> byLocation = new HashMap<>();
++    final int uniformCount = glGetProgrami(program, GL_ACTIVE_UNIFORMS);
++
++    try(final MemoryStack stack = MemoryStack.stackPush()) {
++      final IntBuffer size = stack.mallocInt(1);
++      final IntBuffer type = stack.mallocInt(1);
++
++      for(int i = 0; i < uniformCount; i++) {
++        final String uniform = glGetActiveUniform(program, i, size, type);
++        final int location = glGetUniformLocation(program, uniform);
++
++        // Members of uniform blocks have no location
++        if(location == -1) {
++          continue;
++        }
++
++        sb.append("\n  uniform ").append(uniform).append(" type=0x").append(Integer.toHexString(type.get(0))).append(" location=").append(location);
++
++        final int t = type.get(0);
++        if(t == GL_SAMPLER_2D || t == GL_UNSIGNED_INT_SAMPLER_2D || t == GL_INT_SAMPLER_2D) {
++          sb.append(" unit=").append(glGetUniformi(program, location));
++        }
++
++        final String previous = byLocation.put(location, uniform);
++        if(previous != null) {
++          sb.append("  <-- SAME LOCATION AS ").append(previous);
++        }
++      }
++    }
++
++    final int blockCount = glGetProgrami(program, GL_ACTIVE_UNIFORM_BLOCKS);
++    for(int i = 0; i < blockCount; i++) {
++      sb.append("\n  block ").append(glGetActiveUniformBlockName(program, i))
++        .append(" binding=").append(glGetActiveUniformBlocki(program, i, GL_UNIFORM_BLOCK_BINDING))
++        .append(" size=").append(glGetActiveUniformBlocki(program, i, GL_UNIFORM_BLOCK_DATA_SIZE));
++    }
++
++    LOGGER.info("%s", sb);
++  }
++
++  /** Reads back a region just uploaded with glTexSubImage2D and compares it with the data (first uploads of each texture only) */
++  static void checkUpload(final GlesTexture texture, final int x, final int y, final int w, final int h, final int[] data) {
++    final boolean integer = texture.internalFormat == TextureInternalFormat.R_32_UINT;
++
++    if(!integer && texture.internalFormat != TextureInternalFormat.RGBA_8 || w <= 0 || h <= 0 || data.length < w * h) {
++      return;
++    }
++
++    if(uploadChecks.getOrDefault(texture.name, 0) >= CHECKS_PER_TEXTURE) {
++      return;
++    }
++
++    // Only check uploads that carry something
++    boolean hasData = false;
++    for(int i = 0; i < w * h; i++) {
++      if(data[i] != 0) {
++        hasData = true;
++        break;
++      }
++    }
++
++    if(!hasData) {
++      return;
++    }
++
++    uploadChecks.merge(texture.name, 1, Integer::sum);
++
++    final int oldFramebuffer = glGetInteger(GL_FRAMEBUFFER_BINDING);
++    final int fbo = glGenFramebuffers();
++    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
++    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture.id, 0);
++
++    final int status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
++    if(status != GL_FRAMEBUFFER_COMPLETE) {
++      LOGGER.warn("Upload check %s: can't read back (framebuffer status 0x%x)", texture.name, status);
++    } else {
++      final int channels = integer ? 4 : 1;
++      final IntBuffer pixels = MemoryUtil.memAllocInt(w * h * channels);
++
++      try {
++        if(integer) {
++          glReadPixels(x, y, w, h, GL_RGBA_INTEGER, GL_UNSIGNED_INT, pixels);
++        } else {
++          glReadPixels(x, y, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
++        }
++
++        int differences = 0;
++        int first = -1;
++        int nonZero = 0;
++
++        for(int i = 0; i < w * h; i++) {
++          final int gpu = pixels.get(i * channels);
++
++          if(gpu != 0) {
++            nonZero++;
++          }
++
++          if(gpu != data[i]) {
++            if(first == -1) {
++              first = i;
++            }
++
++            differences++;
++          }
++        }
++
++        if(differences == 0) {
++          LOGGER.info("Upload check %s (%d,%d %dx%d): OK, %d nonzero texels", texture.name, x, y, w, h, nonZero);
++        } else {
++          LOGGER.error("Upload check %s (%d,%d %dx%d): %d of %d texels differ, %d nonzero on the GPU; first at (%d,%d): cpu=0x%08x gpu=0x%08x", texture.name, x, y, w, h, differences, w * h, nonZero, first % w, first / w, data[first], pixels.get(first * channels));
++        }
++      } finally {
++        MemoryUtil.memFree(pixels);
++      }
++    }
++
++    glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
++    glDeleteFramebuffers(fbo);
++  }
++
++  private static final String PROBE_VS = """
++    #version 330 core
++
++    smooth out vec2 vertUv;
++    flat out vec2 vertTpage;
++    flat out vec2 vertClut;
++    flat out float widthMultiplier;
++    flat out int widthMask;
++    flat out int indexShift;
++    flat out int indexMask;
++
++    void main() {
++      vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
++      gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
++      vertUv = p * vec2(16.0, 4.0);
++      vertTpage = vec2(0.0, 0.0);
++      vertClut = vec2(0.0, 3.0);
++
++      // Same as standard.vsh/tmd.vsh for 4bpp
++      int vertBpp = 0;
++      int widthDivisor = 1 << 2 - vertBpp;
++      widthMultiplier = 1.0 / widthDivisor;
++      widthMask = widthDivisor - 1;
++      indexShift = vertBpp + 2;
++      indexMask = int(pow(16, vertBpp + 1) - 1);
++    }
++    """;
++
++  private static final String PROBE_FS = """
++    #version 330 core
++
++    smooth in vec2 vertUv;
++    flat in vec2 vertTpage;
++    flat in vec2 vertClut;
++    flat in float widthMultiplier;
++    flat in int widthMask;
++    flat in int indexShift;
++    flat in int indexMask;
++
++    // Blocks and plain uniforms declared before the samplers, like in standard.fsh, so shaderc gives the samplers bindings 2 and 3
++    // while the game binds them to units 0 and 1 with glUniform1i
++    layout(std140) uniform probeA { float zeroA; };
++    layout(std140) uniform probeB { float zeroB; };
++    uniform vec2 uvOffset;
++    uniform float zeroC;
++
++    uniform sampler2D tex24;
++    uniform usampler2D tex15;
++
++    layout(location = 0) out uvec4 outValue;
++
++    void main() {
++      ivec2 c = ivec2(gl_FragCoord.xy);
++      uint direct = texelFetch(tex15, c, 0).r;
++
++      // Same as the 4bpp path of standard.fsh/tmd.fsh
++      ivec2 uv = ivec2(vertTpage.x + (vertUv.x + uvOffset.x) * widthMultiplier, vertTpage.y + uvOffset.y + zeroA + zeroB + zeroC);
++      ivec4 indexVec = ivec4(texelFetch(tex15, uv, 0));
++      int p = (indexVec.r >> ((int(vertTpage.x + vertUv.x) & widthMask) << indexShift)) & indexMask;
++      uint pixel = texelFetch(tex15, ivec2(vertClut.x + p, vertClut.y), 0).r;
++
++      outValue = uvec4(direct, pixel, uint(indexMask), uint(texture(tex24, vec2(0.5)).a * 255.0 + 0.5));
++    }
++    """;
++
++  /** Draws through an R32UI texture with usampler2D/texelFetch (how the PS1 VRAM is sampled) and checks the result, with and without sampler layout qualifiers */
++  static void probeIntegerTextures() {
++    probe(true);
++    probe(false);
++
++    // Leave the units the way GlesTexture's binding cache expects them (nothing bound, unit 0 active)
++    for(int unit = 2; unit >= 0; unit--) {
++      glActiveTexture(GL_TEXTURE0 + unit);
++      glBindTexture(GL_TEXTURE_2D, 0);
++    }
++  }
++
++  private static void probe(final boolean stripSamplerLayout) {
++    final String label = "VRAM probe (sampler layout " + (stripSamplerLayout ? "stripped" : "kept") + ')';
++
++    // 16x4 R32UI "VRAM": row 0 = 4bpp indices (texel x holds indices 4x..4x+3), rows 1-2 = direct values, row 3 = 16-colour CLUT
++    final int w = 16;
++    final int h = 4;
++    final int[] vram = new int[w * h];
++    for(int x = 0; x < w; x++) {
++      int packed = 0;
++      for(int n = 0; n < 4; n++) {
++        packed |= (4 * x + n & 0xf) << n * 4;
++      }
++
++      vram[x] = packed;
++      vram[w + x] = 0x1000 + x;
++      vram[2 * w + x] = 0x8000 | x * 0x0421;
++      vram[3 * w + x] = 0x8000 | (15 - x) << 10 | x << 5 | 0x1f;
++    }
++
++    final int vertex;
++    final int fragment;
++    try {
++      final IntRef uniformIndex = new IntRef();
++      vertex = compile(label, GL_VERTEX_SHADER, ShaderManager.transpileShader(PROBE_VS, ShaderStage.VERTEX, uniformIndex, stripSamplerLayout));
++      fragment = compile(label, GL_FRAGMENT_SHADER, ShaderManager.transpileShader(PROBE_FS, ShaderStage.FRAGMENT, uniformIndex, stripSamplerLayout));
++    } catch(final RuntimeException e) {
++      LOGGER.error(label + ": transpiling failed", e);
++      return;
++    }
++
++    if(vertex == 0 || fragment == 0) {
++      return;
++    }
++
++    final int program = glCreateProgram();
++    glAttachShader(program, vertex);
++    glAttachShader(program, fragment);
++    glLinkProgram(program);
++    glDeleteShader(vertex);
++    glDeleteShader(fragment);
++
++    if(glGetProgrami(program, GL_LINK_STATUS) == 0) {
++      LOGGER.error("%s: link error: %s", label, glGetProgramInfoLog(program));
++      glDeleteProgram(program);
++      return;
++    }
++
++    glUseProgram(program);
++    glUniform1i(glGetUniformLocation(program, "tex24"), 0);
++    glUniform1i(glGetUniformLocation(program, "tex15"), 1);
++
++    // Both probe blocks read zeros from a buffer on a binding point the game doesn't use
++    final int ubo = glGenBuffers();
++    glBindBuffer(GL_UNIFORM_BUFFER, ubo);
++    glBufferData(GL_UNIFORM_BUFFER, 16L, GL_STATIC_DRAW);
++    glBindBuffer(GL_UNIFORM_BUFFER, 0);
++    glBindBufferBase(GL_UNIFORM_BUFFER, PROBE_UBO_BINDING, ubo);
++    glUniformBlockBinding(program, glGetUniformBlockIndex(program, "probeA"), PROBE_UBO_BINDING);
++    glUniformBlockBinding(program, glGetUniformBlockIndex(program, "probeB"), PROBE_UBO_BINDING);
++
++    dumpProgram(label, program);
++
++    // Unit 1: the "VRAM", uploaded with the same int[] overload as Gpu/GlesTexture
++    final int vramTexture = glGenTextures();
++    glActiveTexture(GL_TEXTURE1);
++    glBindTexture(GL_TEXTURE_2D, vramTexture);
++    setNearest();
++    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, w, h, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, (ByteBuffer)null);
++    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RED_INTEGER, GL_UNSIGNED_INT, vram);
++
++    // Unit 0: a 1x1 opaque colour texture, like tex24
++    final int colourTexture = glGenTextures();
++    glActiveTexture(GL_TEXTURE0);
++    glBindTexture(GL_TEXTURE_2D, colourTexture);
++    setNearest();
++
++    // Unit 2: the RGBA32UI target
++    final int targetTexture = glGenTextures();
++    glActiveTexture(GL_TEXTURE2);
++    glBindTexture(GL_TEXTURE_2D, targetTexture);
++    setNearest();
++    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32UI, w, h, 0, GL_RGBA_INTEGER, GL_UNSIGNED_INT, (ByteBuffer)null);
++
++    final int fbo = glGenFramebuffers();
++    final int vao = glGenVertexArrays();
++    final IntBuffer result = MemoryUtil.memAllocInt(w * h * 4);
++
++    try(final MemoryStack stack = MemoryStack.stackPush()) {
++      final ByteBuffer white = stack.malloc(4);
++      white.put(0, (byte)0xff).put(1, (byte)0xff).put(2, (byte)0xff).put(3, (byte)0xff);
++      glActiveTexture(GL_TEXTURE0);
++      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, white);
++
++      glBindFramebuffer(GL_FRAMEBUFFER, fbo);
++      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, targetTexture, 0);
++
++      final int status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
++      if(status != GL_FRAMEBUFFER_COMPLETE) {
++        LOGGER.error("%s: RGBA32UI target incomplete (0x%x)", label, status);
++        return;
++      }
++
++      glDisable(GL_DEPTH_TEST);
++      glDisable(GL_BLEND);
++      glDisable(GL_SCISSOR_TEST);
++      glDisable(GL_CULL_FACE);
++      glViewport(0, 0, w, h);
++      glBindVertexArray(vao);
++      glDrawArrays(GL_TRIANGLES, 0, 3);
++      glReadPixels(0, 0, w, h, GL_RGBA_INTEGER, GL_UNSIGNED_INT, result);
++
++      int directWrong = 0;
++      int clutWrong = 0;
++      final StringBuilder samples = new StringBuilder();
++
++      for(int y = 0; y < h; y++) {
++        for(int x = 0; x < w; x++) {
++          final int i = (y * w + x) * 4;
++          final int expectedDirect = vram[y * w + x];
++          final int expectedClut = vram[3 * w + x];
++
++          if(result.get(i) != expectedDirect) {
++            directWrong++;
++          }
++
++          if(result.get(i + 1) != expectedClut) {
++            clutWrong++;
++          }
++
++          if(y == 0 && x < 4 || y == 3 && x == 15) {
++            samples.append(String.format(" (%d,%d) direct=0x%x/0x%x clut=0x%x/0x%x", x, y, result.get(i), expectedDirect, result.get(i + 1), expectedClut));
++          }
++        }
++      }
++
++      final boolean ok = directWrong == 0 && clutWrong == 0 && result.get(2) == 15 && result.get(3) == 255;
++      LOGGER.log(ok ? Level.INFO : Level.ERROR,
++        "%s: %s. direct texelFetch wrong in %d/%d, 4bpp+CLUT wrong in %d/%d, indexMask=%d (expected 15), tex24 alpha=%d (expected 255). got/expected:%s",
++        label, ok ? "OK" : "FAILED", directWrong, w * h, clutWrong, w * h, result.get(2), result.get(3), samples);
++    } finally {
++      MemoryUtil.memFree(result);
++      glBindVertexArray(0);
++      glDeleteVertexArrays(vao);
++      glBindFramebuffer(GL_FRAMEBUFFER, 0);
++      glDeleteFramebuffers(fbo);
++      glUseProgram(0);
++      glDeleteProgram(program);
++      glDeleteTextures(vramTexture);
++      glDeleteTextures(colourTexture);
++      glDeleteTextures(targetTexture);
++      glBindBufferBase(GL_UNIFORM_BUFFER, PROBE_UBO_BINDING, 0);
++      glDeleteBuffers(ubo);
++
++      int error;
++      while((error = glGetError()) != GL_NO_ERROR) {
++        LOGGER.error("%s: glGetError 0x%04x (%s)", label, error, errorName(error));
++      }
++    }
++  }
++
++  private static void setNearest() {
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
++  }
++
++  private static int compile(final String label, final int type, final String source) {
++    final int shader = glCreateShader(type);
++    glShaderSource(shader, source);
++    glCompileShader(shader);
++
++    if(glGetShaderi(shader, GL_COMPILE_STATUS) == 0) {
++      LOGGER.error("%s: compile error: %s\n%s", label, glGetShaderInfoLog(shader), source);
++      glDeleteShader(shader);
++      return 0;
++    }
++
++    return shader;
++  }
++}
+diff --git a/src/main/java/legend/core/renderer/opengles/GlesShader.java b/src/main/java/legend/core/renderer/opengles/GlesShader.java
+index 8df7c6274..9965e75b7 100644
+--- a/src/main/java/legend/core/renderer/opengles/GlesShader.java
++++ b/src/main/java/legend/core/renderer/opengles/GlesShader.java
+@@ -136,6 +136,11 @@ public class GlesShader<Options extends ShaderOptions> implements Shader<Options
+     this.shader = this.linkProgram(stages);
+     this.deleteShaders(stages);
+     this.options = this.optionsSupplier.apply(this);
++
++    // After the options supplier, so the sampler units it sets show up
++    if(GlesDiagnostics.ENABLED) {
++      GlesDiagnostics.dumpProgram(this.name, this.shader);
++    }
+   }
+ 
+   private void deleteShaders(final int[] shaders) {
+diff --git a/src/main/java/legend/core/renderer/opengles/GlesTexture.java b/src/main/java/legend/core/renderer/opengles/GlesTexture.java
+index 2529e96ac..a7b1fad9e 100644
+--- a/src/main/java/legend/core/renderer/opengles/GlesTexture.java
++++ b/src/main/java/legend/core/renderer/opengles/GlesTexture.java
+@@ -137,6 +137,10 @@ public final class GlesTexture extends Texture {
+   public void data(final int x, final int y, final int w, final int h, final TextureDataType dataType, final int[] data) {
+     this.use();
+     glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, this.getDataFormat(this.dataFormat), this.getDataType(dataType), data);
++
++    if(GlesDiagnostics.ENABLED) {
++      GlesDiagnostics.checkUpload(this, x, y, w, h, data);
++    }
+   }
+ 
+   @Override
+-- 
+2.56.1.windows.1
+

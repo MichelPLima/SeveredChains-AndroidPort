@@ -1,0 +1,62 @@
+From fa6331cd654cc0122229b80a6dcde9b1d2924afa Mon Sep 17 00:00:00 2001
+From: MichelPLima <109321208+MichelPLima@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 11:26:58 -0300
+Subject: [PATCH] =?UTF-8?q?GLES:=20pular=20desenho=20com=20menos=20v=C3=A9?=
+ =?UTF-8?q?rtices=20que=20uma=20primitiva?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Na batalha, um QueuedModelStandard desenha uma malha com menos de 3 vértices
+(glDrawArrays em modo de triângulo). Não desenha nada em nenhum driver, mas
+a Adreno reporta como mensagem de debug de severidade alta, e o callback do
+GlesApi mostra isso como notificação no topo da tela. O GlesMesh agora pula
+desenhos com menos vértices que uma primitiva do modo (3 para triângulos,
+6 com adjacência, 2 para linhas).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../core/renderer/opengles/GlesMesh.java       | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/src/main/java/legend/core/renderer/opengles/GlesMesh.java b/src/main/java/legend/core/renderer/opengles/GlesMesh.java
+index 3005b036d..db13bacc5 100644
+--- a/src/main/java/legend/core/renderer/opengles/GlesMesh.java
++++ b/src/main/java/legend/core/renderer/opengles/GlesMesh.java
+@@ -197,9 +197,21 @@ public class GlesMesh implements Mesh {
+     glBindVertexArray(0);
+   }
+ 
++  /**
++   * Fewest vertices that make one primitive in this mode. A draw with fewer draws nothing; desktop drivers skip it silently, but the
++   * Adreno driver reports it as a high-severity debug message (which the debug callback shows as an on-screen notification).
++   */
++  private int minimumVertices() {
++    return switch(this.mode) {
++      case GL_TRIANGLES_ADJACENCY -> 6;
++      case GL_LINES, GL_LINE_LOOP, GL_LINE_STRIP -> 2;
++      default -> 3;
++    };
++  }
++
+   @Override
+   public void draw() {
+-    if(this.deleted) {
++    if(this.deleted || this.count < this.minimumVertices()) {
+       return;
+     }
+ 
+@@ -223,6 +235,10 @@ public class GlesMesh implements Mesh {
+       return;
+     }
+ 
++    if(count < this.minimumVertices()) {
++      return;
++    }
++
+     glBindVertexArray(this.vao);
+ 
+     if(this.useIndices) {
+-- 
+2.56.1.windows.1
+

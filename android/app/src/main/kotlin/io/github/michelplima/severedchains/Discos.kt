@@ -57,7 +57,7 @@ object Discos {
     fun codigo(indice: Int): String = IDS[indice].let { it.substring(0, 4) + "-" + it.substring(4) }
 
     /** Ex.: "Discos: 1 ✓  2 ✓  3 –  4 –" */
-    fun resumo(ctx: Context): String = "Discos: " + IDS.indices.joinToString("  ") { "${it + 1} " + if(arquivo(ctx, it).isFile) "✓" else "–" }
+    fun resumo(ctx: Context): String = ctx.getString(R.string.discos_resumo) + ": " + IDS.indices.joinToString("  ") { "${it + 1} " + if(arquivo(ctx, it).isFile) "✓" else "–" }
 
     fun pedir(activity: Activity) {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -85,9 +85,9 @@ object Discos {
             val (nome, tamanho) = info(ctx, uri)
             try {
                 ctx.contentResolver.openInputStream(uri)?.use { importarUm(ctx, it, nome, tamanho, andamento) }
-                    ?: recusar(ctx, andamento, nome, "o seletor não abriu o arquivo")
+                    ?: recusar(ctx, andamento, nome, ctx.getString(R.string.recusa_seletor))
             } catch(e: Exception) {
-                recusar(ctx, andamento, nome, "falha ao ler ou gravar (${e.message ?: e})")
+                recusar(ctx, andamento, nome, ctx.getString(R.string.recusa_leitura, (e.message ?: e).toString()))
             }
         }
         Logs.escrever(ctx, resumo(ctx))
@@ -102,7 +102,7 @@ object Discos {
         andamento.conferindo(nome)
         val cabecalho = ByteArray(CABECALHO)
         val lidos = lerAte(entrada, cabecalho)
-        val indice = identificar(cabecalho, lidos)
+        val indice = identificar(ctx, cabecalho, lidos)
         if(indice !is Int) {
             recusar(ctx, andamento, nome, indice.toString())
             return
@@ -115,7 +115,7 @@ object Discos {
         }
         val livre = pasta(ctx).usableSpace + (if(destino.isFile) destino.length() else 0)
         if(tamanho > 0 && livre < tamanho + MARGEM_LIVRE) {
-            recusar(ctx, andamento, nome, "sem espaço para o disco ${indice + 1} (precisa de ${mb(tamanho + MARGEM_LIVRE)} MB, livres ${mb(livre)} MB)")
+            recusar(ctx, andamento, nome, ctx.getString(R.string.recusa_espaco, indice + 1, mb(tamanho + MARGEM_LIVRE), mb(livre)))
             return
         }
 
@@ -147,13 +147,13 @@ object Discos {
         }
         if(tamanho > 0 && copiados != tamanho) {
             parte.delete()
-            recusar(ctx, andamento, nome, "cópia incompleta ($copiados de $tamanho bytes), descartada")
+            recusar(ctx, andamento, nome, ctx.getString(R.string.recusa_incompleta, copiados, tamanho))
             return
         }
         if(destino.exists()) destino.delete()
         if(!parte.renameTo(destino)) {
             parte.delete()
-            recusar(ctx, andamento, nome, "não consegui gravar ${destino.name}")
+            recusar(ctx, andamento, nome, ctx.getString(R.string.recusa_gravar, destino.name))
             return
         }
         val segundos = (System.nanoTime() - inicio) / 1e9
@@ -161,27 +161,27 @@ object Discos {
         andamento.importado(indice, novo = true)
     }
 
-    /** Índice do disco (0 a 3) ou o motivo da recusa, para o log. */
-    private fun identificar(c: ByteArray, lidos: Int): Any {
+    /** Índice do disco (0 a 3) ou o motivo da recusa (para a tela e o log). */
+    private fun identificar(ctx: Context, c: ByteArray, lidos: Int): Any {
         // trim como o String.trim() do Java (tira tudo <= ' ', inclusive \0); o trim() do Kotlin não tira \0
         fun texto(de: Int, n: Int) = String(c, INICIO_PVD + de, n, Charsets.US_ASCII).trim { it <= ' ' }
         val pvd = lidos >= CABECALHO && c[INICIO_PVD].toInt() == 1 && texto(1, 5) == "CD001" && c[INICIO_PVD + 6].toInt() == 1
         if(!pvd) {
             // Só para explicar a recusa: formatos comuns em coleções de ROMs que o jogo não lê
-            if(lidos >= 4 && String(c, 0, 4, Charsets.US_ASCII) == "\u0000PBP") return "é .pbp (EBOOT de PSP): o jogo precisa do .bin"
-            if(lidos >= 8 && String(c, 0, 8, Charsets.US_ASCII) == "MComprHD") return "é .chd (comprimido): o jogo precisa do .bin (chdman extractcd gera .cue + .bin)"
+            if(lidos >= 4 && String(c, 0, 4, Charsets.US_ASCII) == "\u0000PBP") return ctx.getString(R.string.recusa_pbp)
+            if(lidos >= 8 && String(c, 0, 8, Charsets.US_ASCII) == "MComprHD") return ctx.getString(R.string.recusa_chd)
             if(lidos >= 16 * 2048 + 6 && c[16 * 2048].toInt() == 1 && String(c, 16 * 2048 + 1, 5, Charsets.US_ASCII) == "CD001") {
-                return "é .iso de 2048 bytes por setor: o jogo precisa do .bin cru (2352 bytes por setor)"
+                return ctx.getString(R.string.recusa_iso)
             }
-            if(lidos < CABECALHO) return "pequeno demais para um disco (${lidos} bytes; um .cue? escolha o .bin)"
-            return "não é um .bin de CD (2352 bytes por setor)"
+            if(lidos < CABECALHO) return ctx.getString(R.string.recusa_pequeno, lidos)
+            return ctx.getString(R.string.recusa_nao_bin)
         }
         // Mesmos offsets do Unpacker (7 e 39: ele lê o byte 7, que é zero, junto com o sistema)
         val sistema = texto(7, 32)
-        if(sistema != "PLAYSTATION") return "não é disco de PlayStation (sistema \"$sistema\")"
+        if(sistema != "PLAYSTATION") return ctx.getString(R.string.recusa_nao_playstation, sistema)
         val id = texto(39, 32)
         val i = IDS.indexOf(id)
-        if(i < 0) return "não é um disco NTSC-U do Legend of Dragoon (ID \"$id\"; o jogo só aceita SCUS94491, SCUS94584, SCUS94585 e SCUS94586)"
+        if(i < 0) return ctx.getString(R.string.recusa_outro_disco, id)
         return i
     }
 

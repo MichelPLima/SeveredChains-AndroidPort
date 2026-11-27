@@ -1,6 +1,6 @@
-Atualizado: 2026-11-25
+Atualizado: 2026-11-26
 
-Fase: 3 (M3 "Jogo": etapas 1 a 3 OK no aparelho; o jogo roda até o primeiro submap, com bugs visuais a investigar). Fases 0 e 2 (M1) concluídas; Fase 1 (Termux) cancelada
+Fase: 3 (M3 "Jogo": etapas 1 a 3 OK no aparelho; o jogo roda até o primeiro submap; bugs visuais em investigação com o build de diagnóstico 0.5.2-m3c). Fases 0 e 2 (M1) concluídas; Fase 1 (Termux) cancelada
 
 Feito:
 - Estrutura do repositório e docs iniciais; levantamento do upstream no commit edcf232
@@ -41,16 +41,50 @@ Feito:
   - FMV do disco STR/DEMOH.IKI (MDEC em Java) tocou; tela título; opções (config salvo); New Campaign; FMV STR/OPENH.IKI; submap cut 675 com cartão de capítulo; transição para o cut 676. Música (sequências) iniciada
   - Tela do launcher: janela de 1920x1025 px, 369 dpi, densidade 2,30625 (= 832x444 dp)
   - **Bugs visuais relatados pelo Michel** ("vários") que o log não mostra: o GlesApi não registra glGetError nem erros de draw. Faltam prints/descrição de cada bug para diagnosticar
-  - **Crash ao sair** (Voltar): onClose em Scus94491BpeSegment.bindRendererEvents (linha 216) chama javafx.application.Platform.exit() → NoClassDefFoundError (JavaFX fora do APK) → "Crash detected", o jogo gera um "recovery save" e chama System.exit; o bionic imprime FORTIFY (mutex destruído) na saída. Correção prevista: patch Android que pula o Platform.exit() quando o JavaFX não está no classpath (junto com o Discord desligado, patch 0003)
+  - **Crash ao sair** (Voltar): onClose em Scus94491BpeSegment.bindRendererEvents (linha 216) chama javafx.application.Platform.exit() → NoClassDefFoundError (JavaFX fora do APK) → "Crash detected", o jogo gera um "recovery save" e chama System.exit; o bionic imprime FORTIFY (mutex destruído) na saída. Corrigido no patch 0006 (0.5.2-m3c, a confirmar no aparelho)
+
+- Bugs visuais (prints de 2026-11-26 em logs/): no primeiro submap (cut 675) o fundo aparece; os recortes de primeiro plano saem como manchas de uma cor só (ciano, cor de 15 bits do PS1 R=14 G=30 B=30); a caixa de diálogo aparece sem borda e sem texto; o personagem some (só a sombra aparece). Padrão: tudo que lê a VRAM do PS1 (textura R32UI, `usampler2D` + `texelFetch` + CLUT) some; o que usa textura comum (RGBA8) aparece. A VRAM não era exercitada antes desse submap (o título só usa BITS_24). Causa ainda não confirmada. Caso: docs/processos/casos/2026-11-26-submap-sem-vram-e-primeiro-plano-ciano.md
+- 0.5.2-m3c (2026-11-26, dist/sc-android-m3c.apk, 155 MB): build de correção + diagnóstico, **ainda não testado no aparelho**
+  - Patch 0003: depth buffer em DEPTH_COMPONENT32F (DEPTH_COMPONENT + FLOAT é inválido no GLES; a Adreno aceitava calada)
+  - Patch 0004: samplers sem `layout(location/binding)` no GLSL ES (o spvc deixava, ex. `tex15` location 7 binding 3, e o jogo liga as unidades 0/1 por glUniform1i). `-Dsc.gles.samplerLayout=keep` volta ao anterior
+  - Patch 0005 (`-Dsc.gles.diag=true`, ligado no Jvm.kt): mensagens do driver sem repetição (também MEDIUM, e mesmo sem contexto de debug), glGetError por quadro, uniforms/unidades/blocos de cada programa, leitura de volta dos 2 primeiros uploads de cada textura (VRAM 15, Submap background, Submap foreground N...), sonda da VRAM na inicialização (R32UI 16x4 + CLUT 4bpp desenhada com os mesmos trechos de shader do jogo, com e sem layout nos samplers)
+  - ponte.c: contexto EGL de debug (EGL_CONTEXT_OPENGL_DEBUG), como o upstream pede no PC; volta ao comum se recusado. Decisão em 04-decisoes.md
+  - Patch 0006: o Voltar não chama mais `javafx.application.Platform.exit()` no Android (era o crash ao sair)
+  - No PC: os 4 patches aplicam limpo sobre 0001-0002 (scripts/aplicar-patches.sh), o jogo compila e os 6 programas e a sonda transpilam (samplers sem layout conferidos)
+- Teste 0.5.2-m3c no Odin (2026-11-26, relato do Michel, sem log ainda): "tudo pareceu funcionar de acordo" (personagem, caixa de diálogo e cenário certos). Falta o log para saber qual correção resolveu (sonda da VRAM com/sem layout, uniforms, uploads) e fechar o caso
+- Log do 0.5.2-m3c (logs/sc-android-log-20261126-105409.txt) e print (Screenshot_20261126-104741.png): cena certa; sonda da VRAM OK com e sem layout nos samplers; uniforms e uploads OK; contexto de debug aceito; saída pelo Voltar limpa (patch 0006 confirmado). Único erro do driver: draw com menos de 3 vértices num efeito de batalha (inofensivo). Causa dos bugs não isolada (suspeita: depth buffer do 0003; contexto de debug não descartado). Detalhes no caso
+- 0.5.3-m3c (2026-11-26, dist/sc-android-m3c.apk, 155 MB), **ainda não testado no aparelho**:
+  - Patch 0007: sem o selo anti-slop na abertura (pedido do Michel; decisão em 04-decisoes.md). O build do upstream copia gfx/ sem apagar sobras: o noslop.png velho foi apagado à mão de upstream/build/libs
+  - Telas do app em PT-BR, espanhol e inglês (padrão), seguindo o Android, com botão "Idioma" no rodapé do launcher (janela no estilo do app: Idioma do sistema / Português (Brasil) / Español / English). Android 13+ usa o idioma por app do sistema (também em Configurações > Idiomas do app); 9 a 12, preferência própria. Idioma.kt, res/values{,-pt,-es}/strings.xml, res/xml/locales_config.xml. Log continua em português; o jogo tem os próprios idiomas (inglês e polonês)
+  - Diagnóstico GLES e contexto de debug continuam ligados
+- Teste 0.5.3-m3c no Odin (log logs/sc-android-log-20261126-111942.txt): jogo até batalha e game over, saída limpa (código 0). Print logs/Screenshot_20261126-111759.png: na batalha aparece no topo "GL ERROR 2147483647: unable to generate a triangle primitive because there are less than 3 vertices" (notificação do callback de debug do upstream, por causa do diagnóstico ligado; 6 ocorrências registradas no log, sem efeito visual)
+- 0.5.4-m3c (2026-11-26, dist/sc-android-m3c.apk), **ainda não testado no aparelho**:
+  - Patch 0008: GlesMesh pula desenhos com menos vértices que uma primitiva (causa da mensagem)
+  - Diagnóstico GLES e contexto EGL de debug viram chave na tela Diagnóstico ("Diagnóstico GLES: ligado/desligado"), **desligada por padrão**. É também o teste que falta para fechar o caso dos bugs visuais: sem contexto de debug, a primeira cena (Dart no penhasco, caixa de diálogo) tem de continuar certa
+- Teste 0.5.5-m3c (relato do Michel, 2026-11-26): janela de confirmação do Voltar OK
+- Teste 0.5.4-m3c (relato do Michel): a notificação de GL ERROR sumiu; turbo mapeado em Options > Controls funcionou pelo controle
+- 0.5.5-m3c (2026-11-26, dist/sc-android-m3c.apk), **ainda não testado no aparelho**: no jogo, o Voltar abre a janela "Sair do jogo? O progresso desde o último save será perdido." [Sair] [Continuar jogando] (foco em Continuar; A confirma, B ou Voltar fecha; toque funciona). Com a janela aberta o controle não vai para o jogo, e o que estava apertado é solto no jogo ao abrir. O jogo continua rodando por trás (não há pausa). Nos testes M2/M3a o Voltar sai direto. Voltar coberto pelos dois caminhos: onBackPressed (KEYCODE_BACK) e OnBackInvokedCallback (Android 16 com targetSdk 36). Textos em PT/ES/EN
+- Confirmado pelo Michel (2026-11-26): primeira cena certa sem contexto de debug (caso dos bugs visuais fechado: correção nos patches 0003/0004), abertura sem o selo, launcher em PT/ES/EN
+- Antes de uma versão pública (já registrado em 04-decisoes.md e no roadmap, Fase 6): JRE 25 e natives do LWJGL compilados por nós no CI (hoje são builds comunitários), APK de release assinado (hoje é debug), conformidade AGPL (código público, link para o código no app, créditos do upstream), Discord desligado e a ação "Debug: open debugger" neutralizada no Android
+- 0.6.0 (2026-11-26, dist/sc-android-m3c.apk), **ainda não testado no aparelho**, rumo à versão pública:
+  - Patch 0009 (identidade do port: versão "3.0.0 - Android 0.6.0" na tela título e no log, crash e link de problemas do "About" para o port, `openUrl` pelo app via fila no ponte.c) e 0010 (sem Discord e sem o depurador JavaFX no Android)
+  - Launcher: botão Créditos (CreditosActivity: componentes, licenças em assets/licencas, links de site e código-fonte; apresentação diz que o port é feito com ajuda de IA) e linha de atualizações na janela dos discos (Atualizacao.kt: Releases do GitHub, canal Estável/Teste, download com SHA-256 no PackageInstaller). Permissões INTERNET e REQUEST_INSTALL_PACKAGES (decisão em 04-decisoes.md)
+  - Assinatura própria preparada no Gradle (android/assinatura.properties, fora do git); LICENSE (AGPL-3.0) na raiz do repositório; .gitignore com chaves e android/runtime-test/bin/
+  - Repositório público: github.com/MichelPLima/SeveredChains-AndroidPort (Projeto.REPOSITORIO; nome escolhido pelo Michel em 2026-11-26)
+- Widescreen (pergunta do Michel): é o comportamento do upstream, igual no PC. Os vídeos (FMV do disco e intro.mp4) são escalados por min(largura, altura) a partir de 320 px de largura, então ficam 4:3 com barras laterais. Nas áreas 2D a opção "2D Widescreen Mode" (Expanded padrão / Forced 4:3 / Stretched) decide; em Expanded só aparece além do 4:3 o que existe na arte do fundo. Áreas 3D (mapa-múndi, batalha) seguem "3D Widescreen"
+- Print do launcher (logs/Screenshot_20261126-100100.png): visual conforme o planejado. A barra cinza fina na borda direita fica fora das views do app (provável alça de borda do sistema do Odin). O aviso "A última sessão do jogo fechou com erro" era do crash ao sair
 
 Próximo passo (nova sessão a partir daqui):
-1. Bugs visuais: Michel traz prints (logs/) e descreve cada bug (onde: FMV, título, menus, submap; o que: cor, textura, transparência, geometria, piscar). Comparar com o baseline do PC (GL 3.3). Suspeitos naturais: diferenças GL 3.3 x GLES 3.2 no GlesApi (formatos de textura, blend/translucência, profundidade, geometry shader na Adreno) e a transpilação 330 → GLSL ES 320 (precisão mediump, conversões). Para ver mais no log: instrumentar o GlesApi (glGetError após draws, KHR_debug/glDebugMessageCallback se a Adreno expuser) num patch de diagnóstico
-2. Patch 0003 (Android): Discord desligado + pular javafx Platform.exit() no onClose (crash ao sair)
-3. Print do launcher para ajustar o visual (832x444 dp no Odin)
-4. Depois: M4 (áudio do jogo conferido, pausa/retomada, saves, saída limpa sem FORTIFY)
+1. Michel testa o 0.6.0 (dist/sc-android-m3c.apk, ainda com a chave de debug, instala por cima): versão "3.0.0 - Android 0.6.0" na tela título; launcher com botão Créditos (lista, leitor de licença, links) e linha de atualizações (versão, canal Estável/Teste, Verificar; sem o repositório público a verificação mostra "não deu para verificar"); "About" do jogo abrindo links no navegador; Discord fora do log
+2. Repositório MichelPLima/SeveredChains-AndroidPort criado privado (2026-11-26), branch main, README público, menções pessoais neutralizadas, logo do launcher mantido (decisão do Michel). Falta: Michel conferir no GitHub e então tornar público. Fork do Severed Chains: opcional (cópia de segurança do commit base edcf232)
+3. Chave de assinatura (Michel, docs/processos/assinatura.md). A troca da chave de debug exige desinstalar uma vez no Odin (perde discos importados, extração e saves)
+4. CI (GitHub Actions, grátis em repositório público): JRE 25 Android e natives do LWJGL (liblwjgl, opengles, stb, 16 KB) compilados por nós; depois o APK de release pela tag
+5. Primeiro release (docs/processos/publicar-versao.md) e teste do atualizador de ponta a ponta
+6. Pendências menores: lista completa das bibliotecas Java do jogo com licenças (gerar dos POMs do Maven) na tela Créditos; turbo com botão padrão no Android (ex.: R3)?
+7. Depois: M4 (áudio do jogo conferido, pausa/retomada, saves)
 
 Bloqueios:
-- Bugs visuais sem descrição: o log não mostra erros de renderização
+- Nenhum
 
 Notas:
 - Aparelho: AYN Odin 2 Portal (Snapdragon 8 Gen 2 / Adreno 740, 16:9). Sem adb: Michel copia e instala tudo manualmente

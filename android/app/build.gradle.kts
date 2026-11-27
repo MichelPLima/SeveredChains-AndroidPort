@@ -1,5 +1,6 @@
 import java.net.URI
 import java.security.MessageDigest
+import java.util.Properties
 import java.util.zip.ZipFile
 
 plugins {
@@ -36,6 +37,12 @@ val arquivosDeSuporteDoJogo = listOf("gfx/**", "lang/**", "patches/**", "log4j2.
 // Jars de libs/ que não vão para o Android: natives de PC (LWJGL, ffmpeg do bytedeco) e JavaFX (só o debugger usa)
 val jarsDoJogoExcluidos = listOf(Regex(".*-natives-.*\\.jar"), Regex("javafx-.*\\.jar"), Regex(".*-(windows|linux|macosx)-(x86_64|x86|arm64|aarch64)\\.jar"))
 
+// Assinatura própria (docs/processos/assinatura.md): android/assinatura.properties, fora do git, aponta para a chave.
+// Com ela, o release e também os builds de teste saem assinados com a mesma chave, então uma versão instala por
+// cima da outra e o atualizador do launcher funciona. Sem o arquivo: debug com a chave de debug do SDK, release sem assinatura.
+val arquivoAssinatura = rootProject.file("assinatura.properties")
+val assinatura = Properties().apply { if(arquivoAssinatura.isFile) arquivoAssinatura.inputStream().use { load(it) } }
+
 android {
     namespace = "io.github.michelplima.severedchains"
     compileSdk = 36
@@ -45,11 +52,32 @@ android {
         applicationId = "io.github.michelplima.severedchains"
         minSdk = 28
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.5.1-m3c"
+        versionCode = 14
+        versionName = "0.6.0"
 
         ndk {
             abiFilters += "arm64-v8a"
+        }
+    }
+
+    signingConfigs {
+        if(arquivoAssinatura.isFile) {
+            create("propria") {
+                storeFile = file(assinatura.getProperty("arquivo"))
+                storePassword = assinatura.getProperty("senha")
+                keyAlias = assinatura.getProperty("apelido")
+                keyPassword = assinatura.getProperty("senhaDaChave", assinatura.getProperty("senha"))
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("propria")
+        }
+        getByName("debug") {
+            signingConfigs.findByName("propria")?.let { signingConfig = it }
         }
     }
 

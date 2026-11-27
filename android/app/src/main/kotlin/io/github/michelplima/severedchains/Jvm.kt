@@ -1,6 +1,7 @@
 package io.github.michelplima.severedchains
 
 import android.content.Context
+import android.system.Os
 import java.io.File
 
 /** Monta classpath e opções e inicia a HotSpot (processo ":jvm"). */
@@ -57,6 +58,7 @@ object Jvm {
         trabalho.mkdirs()
         val libDir = ctx.applicationInfo.nativeLibraryDir
         val jogo = prepararArquivosDoJogo(ctx)
+        val diagnostico = DiagnosticoGles.ligado(ctx)
 
         val opcoes = buildList {
             add("-Djava.class.path=${prepararClasspath(ctx)}")
@@ -91,13 +93,37 @@ object Jvm {
             // Alocador do sistema (bionic): o jogo não usa mimalloc/jemalloc e eles não vão no APK
             add("-Dorg.lwjgl.system.allocator=system")
             add("-Dsc.shaders.dir=${File(jogo, "gfx/shaders").path}")
+            // Diagnóstico do renderer GLES (patch 0005): erros do driver, uniforms dos programas, conferência de
+            // upload das texturas e sonda da VRAM. Desligado por padrão; chave na tela Diagnóstico
+            if(diagnostico) add("-Dsc.gles.diag=true")
+            // Identidade do port no jogo (patch 0009): versão na tela título e no log; crash e "About" apontam para o port
+            add("-Dsc.android.version=${ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName}")
+            add("-Dsc.android.reportUrl=${Projeto.URL_PROBLEMAS}")
             // FFmpeg do bytedeco (vídeo de abertura): na HotSpot a JavaCPP detectaria linux-arm64; as .so são as
             // android-arm64 do APK, que ela carrega com System.loadLibrary pelo java.library.path
             add("-Dorg.bytedeco.javacpp.platform=android-arm64")
             add("-Djava.library.path=$libDir")
         }
 
-        Logs.escrever(ctx, "Iniciando HotSpot ($mainClass): java.home=${javaHome.path}, diretório=${trabalho.path}")
+        // Lido pelo ponte.c ao criar o contexto EGL (contexto de debug só com o diagnóstico ligado)
+        Os.setenv("SC_GL_DEBUG", if(diagnostico) "1" else "0", true)
+        Logs.escrever(ctx, "Iniciando HotSpot ($mainClass): java.home=${javaHome.path}, diretório=${trabalho.path}, diagnóstico GLES ${if(diagnostico) "ligado" else "desligado"}")
         return Native.iniciarJvm(javaHome.path, trabalho.path, Logs.principal(ctx).path, opcoes.toTypedArray(), mainClass, arrayOf())
+    }
+}
+
+/**
+ * Chave do diagnóstico do renderer GLES (patch 0005) e do contexto EGL de debug, na tela Diagnóstico. Desligada por padrão:
+ * com ela ligada, o jogo registra as mensagens do driver no log e mostra as graves como notificação no topo da tela.
+ * O processo ":jvm" é novo a cada abertura, então lê o valor gravado pelo app.
+ */
+object DiagnosticoGles {
+    private const val PREFS = "preferencias"
+    private const val CHAVE = "diagnostico_gles"
+
+    fun ligado(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(CHAVE, false)
+
+    fun definir(ctx: Context, ligado: Boolean) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(CHAVE, ligado).commit()
     }
 }

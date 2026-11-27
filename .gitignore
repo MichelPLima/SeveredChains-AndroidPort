@@ -41,3 +41,11 @@ android/.kotlin/
 
 # Logs trazidos do aparelho
 logs/
+
+# Assinatura do APK: a chave e as senhas nunca vão para o git (docs/processos/assinatura.md)
+android/assinatura.properties
+*.jks
+*.keystore
+
+# Saída de compilação de IDE
+android/runtime-test/bin/

@@ -17,7 +17,7 @@ object Abrir {
     fun jvm(activity: Activity, nome: String, destino: Class<out Activity>, classe: String?, status: (String) -> Unit, fim: (Boolean) -> Unit = {}) {
         if(ocupado) return
         ocupado = true
-        status(if(RuntimeInstaller.javaHome(activity).isDirectory) "Abrindo…" else "Preparando o Java (só na primeira vez)…")
+        status(activity.getString(if(RuntimeInstaller.javaHome(activity).isDirectory) R.string.abrindo else R.string.preparando_java))
         Thread {
             var ok = false
             try {
@@ -27,7 +27,7 @@ object Abrir {
                 ok = true
             } catch(e: Throwable) {
                 Logs.escrever(activity, "ERRO ao preparar runtime: ${e.stackTraceToString()}")
-                activity.runOnUiThread { status("Erro ao preparar o Java. Salve o log para análise.") }
+                activity.runOnUiThread { status(activity.getString(R.string.erro_java)) }
             } finally {
                 ocupado = false
                 activity.runOnUiThread { fim(ok) }

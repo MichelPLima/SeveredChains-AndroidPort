@@ -50,7 +50,7 @@ Formato: data, decisão, motivo, status. Não apagar entradas antigas: marcar co
 ## 2026-11-25: Java 25 Android pronto nos primeiros marcos, build próprio antes de distribuir
 - Decisão: usar o build comunitário `kelvinalumotos/android-openjdk-build-multiarch` release `jre-25.0.5-2` (JRE-25.zip, SHA-256 `2d2ed1cb285ea31fc7cccd20956e68e304ff95fc945b4f877e4f9ccae1e4f884`, CI run 41728698226, commit `de2b663`; fork do QuestCraftPlusPlus). Inspecionado: JDK 25.0.5, AArch64, ligado à bionic (libc.so/libdl.so/libm.so), GNU_HASH presente, LOAD alinhado em 16 KB. Antes de qualquer distribuição, trocar por build nosso no CI (receitas do Amethyst/PojavLauncherTeam)
 - Motivo: compilar o OpenJDK exige host Linux (WSL2 ou GitHub Actions); o build pronto destrava M1–M3. Roda dentro da sandbox do app, que não pede acesso ao armazenamento compartilhado (os ISOs entram pelo seletor do Android)
-- Status: aceita (provisória até a Fase 6)
+- Status: aceita (provisória até a Fase 6). Reconfirmada em 2026-11-26 pelo Michel: compilar os nossos antes da versão pública, mesmo que demore. Usar os de terceiros com crédito seria permitido (LWJGL: BSD, com o texto da licença; JRE: GPLv2 + Classpath Exception, com o código-fonte exato disponível), mas foi descartado por confiança, continuidade e páginas de 16 KB (medido: `liblwjgl_opengles.so` e `liblwjgl_stb.so` do Open-Launcher-Collective alinhados em 4 KB, `liblwjgl.so` misto; não carregam em aparelhos com páginas de 16 KB)
 
 ## 2026-11-25: Ferramentas Android no PC
 - Decisão: Android Studio (winget) + SDK em `%LOCALAPPDATA%\Android\Sdk`: Platform android-36, Build-Tools 36.1.0, NDK r30 (30.0.16248370), CMake 3.31.6 (a série 4.x quebra bibliotecas que declaram CMake < 3.5). AGP 9.5.2 + Gradle 9.9.2. Instalação dos pacotes pelo novo Android CLI (`android sdk install`), que substituiu o `sdkmanager`
@@ -60,7 +60,7 @@ Formato: data, decisão, motivo, status. Não apagar entradas antigas: marcar co
 ## 2026-11-25: Natives LWJGL Android prontos nos primeiros marcos
 - Decisão: `Open-Launcher-Collective/LWJGL3-Android-Builder` release `android-lwjgl-3.4.3` (lwjgl-3.4.3.zip, SHA-256 `dcc658ded7eee2f332ff77afeafb48194fb22b3910180a5e550df8fa3c83a6dd`), compilado no GitHub Actions a partir da tag oficial 3.4.3 com NDK 27.2 e a config Android do próprio LWJGL (ressalva: `libffi.a` pré-compilado do repositório deles). Usados: `liblwjgl.so` e `liblwjgl_opengles.so` (dependem de `libc++_shared.so`, levado do NDK r30). Parte Java do LWJGL vem do Maven (3.4.3, igual ao upstream). Mesma política do JRE: trocar por build nosso antes de distribuir
 - Motivo: o LWJGL não publica natives Android; os módulos com cola JNI própria (core, opengles, stb) precisam ser compilados para Android, e este é o único build comunitário encontrado com `opengles`. Os natives estão alinhados em 4 KB: servem no Odin (páginas de 4 KB), mas aparelhos com páginas de 16 KB vão exigir build próprio
-- Status: aceita (provisória até a Fase 6)
+- Status: aceita (provisória até a Fase 6). Reconfirmada em 2026-11-26 pelo Michel: compilar os nossos antes da versão pública, mesmo que demore. Usar os de terceiros com crédito seria permitido (LWJGL: BSD, com o texto da licença; JRE: GPLv2 + Classpath Exception, com o código-fonte exato disponível), mas foi descartado por confiança, continuidade e páginas de 16 KB (medido: `liblwjgl_opengles.so` e `liblwjgl_stb.so` do Open-Launcher-Collective alinhados em 4 KB, `liblwjgl.so` misto; não carregam em aparelhos com páginas de 16 KB)
 
 ## 2026-11-25: Ponte ART <-> HotSpot numa única biblioteca
 - Decisão: `libscjvm.so` é carregada pelo ART (`System.loadLibrary`) e pela HotSpot (`System.load` do mesmo caminho em `nativeLibraryDir`); o linker devolve a mesma cópia, então Surface, contexto EGL e fila de eventos são memória compartilhada. O EGL (display, config ES3, contexto 3.2, superfície) é feito em C na thread de render da HotSpot; as chamadas GL vêm do LWJGL (`org.lwjgl.opengles.libname=libGLESv2.so`, `org.lwjgl.egl.libname=libEGL.so`). Em `surfaceDestroyed`, o lado ART espera (até 2 s) a HotSpot destruir a EGLSurface; o contexto sobrevive à pausa
@@ -74,8 +74,41 @@ Formato: data, decisão, motivo, status. Não apagar entradas antigas: marcar co
 
 ## 2026-11-25: Discos copiados pelo seletor do Android
 - Decisão: os 4 `.bin` entram pelo seletor do Android (SAF, `ACTION_OPEN_DOCUMENT` com seleção múltipla, sem permissão de armazenamento). O app lê o PVD de cada arquivo como o `Unpacker` (setor 16 cru, "PLAYSTATION", ID SCUS94491/94584/94585/94586) e copia só os discos válidos para `filesDir/jogo/isos/discoN.bin` (via `.parte` + rename). Os originais só são lidos
-- Motivo: o `Unpacker` exige os 4 discos em toda abertura (não só na extração), então o jogo precisa de acesso permanente a eles. Alternativas descartadas: "acesso a todos os arquivos" (permissão ampla de leitura e escrita no armazenamento do aparelho, que é a coleção de ROMs do Michel) e leitura pelo descritor do SAF sem cópia (a HotSpot reabriria `/proc/self/fd/N`, que o FUSE do Android pode negar). Custo: ~2,7 GB extras enquanto as cópias existirem. Escolha do Michel
+- Motivo: o `Unpacker` exige os 4 discos em toda abertura (não só na extração), então o jogo precisa de acesso permanente a eles. Alternativas descartadas: "acesso a todos os arquivos" (permissão ampla de leitura e escrita em todo o armazenamento do aparelho pessoal do Michel) e leitura pelo descritor do SAF sem cópia (a HotSpot reabriria `/proc/self/fd/N`, que o FUSE do Android pode negar). Custo: ~2,7 GB extras enquanto as cópias existirem. Escolha do Michel
 - Futuro: patch para dispensar os discos depois de uma extração completa (`files/version` igual ao `Unpacker.VERSION`), e então apagar as cópias
+- Status: aceita
+
+## 2026-11-26: Contexto EGL de debug e diagnóstico GLES ligado no M3
+- Decisão: o `ponte.c` cria o contexto GLES 3.2 com `EGL_CONTEXT_OPENGL_DEBUG` (EGL 1.5), com volta ao contexto comum se o driver recusar. O app passa `-Dsc.gles.diag=true` (patch 0005) enquanto os bugs visuais do M3 estiverem abertos
+- Motivo: o upstream sempre pede contexto de debug no PC (`SDL_GL_CONTEXT_DEBUG_FLAG`) e o GlesApi só registra erros do driver nesse caso; no Android os erros de renderização não apareciam no log. Custo: alguma validação extra no driver
+- Futuro: desligar os dois por padrão quando os bugs visuais fecharem, deixando a sonda da VRAM como teste do botão "Diagnóstico"
+- Status: substituída em 2026-11-26 (0.5.4-m3c): contexto de debug e diagnóstico passam a ser uma chave na tela Diagnóstico ("Diagnóstico GLES"), desligada por padrão. O Jvm.kt lê a chave, passa `-Dsc.gles.diag=true` e define `SC_GL_DEBUG=1` para o ponte.c. Motivo: com o diagnóstico ligado, as mensagens graves do driver viram notificação no topo da tela do jogo
+
+## 2026-11-26: Port sem o selo anti-slop do upstream
+- Decisão: o patch 0007 tira da tela de abertura o selo `gfx/textures/noslop.png` ("SLOP" riscado) e a legenda `unpacker.made_by_humans` ("Made by Monoxide and other humans"), e apaga o PNG
+- Motivo: este port é feito com ajuda de IA; manter o selo seria incoerente (pedido do Michel). Os créditos do Severed Chains continuam em credits.txt, README e LICENSE (AGPL-3.0)
+- Status: aceita
+
+## 2026-11-26: Idioma das telas do app
+- Decisão: textos do app em recursos Android: `values` (inglês, padrão para qualquer outro idioma), `values-pt` (português do Brasil, vale para qualquer português) e `values-es`. Segue o idioma do Android; a pessoa pode fixar um dos três pelo botão "Idioma" do launcher. Android 13+: idioma por app do sistema (`LocaleManager`, `res/xml/locales_config.xml`, aparece em Configurações > Idiomas do app); Android 9 a 12: preferência do app aplicada no `attachBaseContext`. As telas do processo `:jvm` declaram `configChanges=locale` para a troca de idioma não recriar o jogo
+- Fora do escopo: o log continua em português (é para análise), e o jogo usa os próprios idiomas (o Severed Chains traz inglês e polonês)
+- Status: aceita
+
+## 2026-11-26: Atualizações pelo launcher (Releases do GitHub)
+- Decisão: o launcher mostra versão instalada, canal (Estável/Teste) e consulta os Releases do repositório público do port (`api.github.com`, User-Agent genérico, no máximo a cada 6 h ao abrir, ou pelo botão Verificar). O APK é baixado direto numa sessão do `PackageInstaller`, conferido pelo SHA-256 que o GitHub publica (`digest`) e instalado com a confirmação do Android. Canal Teste = releases marcados como *pre-release*. Processo em `docs/processos/publicar-versao.md`
+- Consequência: o app deixa de ser "sem permissões": `INTERNET` e `REQUEST_INSTALL_PACKAGES` (a pessoa ainda precisa permitir "instalar apps desconhecidos" para o app). O armazenamento compartilhado continua sem acesso. Todas as versões precisam da mesma chave de assinatura (`docs/processos/assinatura.md`)
+- Motivo: pedido do Michel para a versão pública (atualizar sem sair do app)
+- Status: aceita (não testada de ponta a ponta: depende do repositório público e do primeiro release)
+
+## 2026-11-26: Identidade do port e créditos
+- Decisão: patch 0009 mostra "3.0.0 - Android X" no jogo (o `Version.VERSION` interno continua 3.0.0 para os mods), e crash e "About" mandam problemas para o rastreador do port. O launcher ganhou a tela Créditos (port, Severed Chains, aviso da Sony, OpenJDK, LWJGL, OpenAL Soft, Xiph, shaderc/glslang/SPIRV, FFmpeg/JavaCPP, libc++), com os textos das licenças em `assets/licencas` e links para o código-fonte. A apresentação diz que o port é feito com ajuda de IA
+- Motivo: AGPL 5(a) (aviso de versão modificada) e 13 (código para quem usa), obrigações das licenças dos componentes, e não sobrecarregar a equipe do Severed Chains com problemas do Android
+- Pendente: lista completa das bibliotecas Java do jogo com licenças (gerar dos POMs do Maven)
+- Status: aceita
+
+## 2026-11-26: Logo do Severed Chains no launcher
+- Decisão: manter o logo do Severed Chains (`gfx/ui/logo.png`, com o letreiro "The Legend of Dragoon") no launcher. Substitui a regra antiga do README ("não usar nome, logo nem arte da Sony no app")
+- Motivo: é a arte do próprio Severed Chains, que a mostra no repositório e na tela título do jogo; o port corre o mesmo risco que o projeto original. Escolha do Michel
 - Status: aceita
 
 ## Em aberto

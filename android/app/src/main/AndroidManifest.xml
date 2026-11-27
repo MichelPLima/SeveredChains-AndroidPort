@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Nenhuma permissão: o app não acessa o armazenamento compartilhado.
-         Discos e logs passam pelo seletor do Android (SAF). -->
+    <!-- O app não acessa o armazenamento compartilhado: discos e logs passam pelo seletor do Android (SAF).
+         Internet e instalação de pacotes: só para as atualizações pelo launcher (Releases do GitHub do port;
+         ver docs/context/04-decisoes.md). A instalação ainda pede a permissão "instalar apps desconhecidos". -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:allowBackup="false"
@@ -10,6 +13,7 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:label="Severed Chains"
         android:largeHeap="true"
+        android:localeConfig="@xml/locales_config"
         android:theme="@style/Tema.SC">
 
         <!-- Launcher: discos e "Jogar". Paisagem, como o jogo; controle conectado/desconectado não recria a tela -->
@@ -17,12 +21,20 @@
             android:name=".MainActivity"
             android:configChanges="keyboard|keyboardHidden|navigation"
             android:exported="true"
+            android:launchMode="singleTop"
             android:screenOrientation="sensorLandscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Créditos e licenças (AGPL e componentes do APK) -->
+        <activity
+            android:name=".CreditosActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape" />
 
         <!-- Testes M1/M2/M3a, log e "jogo sem checar discos" -->
         <activity
@@ -35,14 +47,15 @@
              o app principal continua aberto e o log pode ser salvo. -->
         <activity
             android:name=".JvmActivity"
+            android:configChanges="locale|layoutDirection"
             android:exported="false"
             android:process=":jvm" />
 
-        <!-- Jogo e testes de tela: tela cheia em paisagem; mudanças de configuração não recriam
-             a Activity (a Surface e a JVM continuam). -->
+        <!-- Jogo e testes de tela: tela cheia em paisagem; mudanças de configuração (inclusive o idioma
+             do app) não recriam a Activity (a Surface e a JVM continuam). -->
         <activity
             android:name=".TelaActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|locale|layoutDirection"
             android:exported="false"
             android:process=":jvm"
             android:screenOrientation="sensorLandscape"
